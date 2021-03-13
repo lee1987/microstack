@@ -1,0 +1,10 @@
+#!/bin/bash
+
+set -ex
+
+export HOME=$SNAP_COMMON/lib/rabbitmq
+
+rabbitmq_password=`snapctl get config.credentials.rabbitmq-password`
+
+$SNAP/usr/sbin/rabbitmqctl add_user openstack $rabbitmq_password || true
+$SNAP/usr/sbin/rabbitmqctl set_permissions openstack ".*" ".*" ".*"

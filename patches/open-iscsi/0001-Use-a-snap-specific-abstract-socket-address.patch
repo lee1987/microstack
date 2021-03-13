@@ -1,0 +1,56 @@
+From 84e8c808d146ef7d4a716bf951875f85fd7020c9 Mon Sep 17 00:00:00 2001
+From: Dmitrii Shcherbakov <dmitrii.shcherbakov@canonical.com>
+Date: Tue, 18 Aug 2020 19:07:37 +0000
+Subject: [PATCH] Use a snap-specific abstract socket address
+
+* open-iscsi is included into Ubuntu cloud images and, as a result,
+sockets with names hard-coded in the source get created and owned by
+systemd at the host level;
+* iscsid checks for the LISTEN_FDS environment variable to determine
+whether systemd passes the necessary socket file descriptors to it -
+this does not happen since iscsid.socket service name differs from the
+actual service name: snap.microstack.iscsid.service;
+* snapd's support for the systemd socket activation feature is present
+but abstract socket names are restricted to be prefixed with
+snap.<snap-name>.<your-socket-name> - this means that open-scsi needs to
+be patched since the abstract domain socket name isn't configurable and
+is hard-coded at the compile time.
+
+This patch alters the hard-coded abstract socket names in order to use
+systemd socket activation via the means supported by snapd and to avoid
+conflicts with an iscsid instance that might be used at the host where
+this snap is installed.
+---
+ usr/mgmt_ipc.h     | 2 +-
+ usr/uip_mgmt_ipc.h | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/usr/mgmt_ipc.h b/usr/mgmt_ipc.h
+index 55972ed..aa66419 100644
+--- a/usr/mgmt_ipc.h
++++ b/usr/mgmt_ipc.h
+@@ -23,7 +23,7 @@
+ #include "iscsi_if.h"
+ #include "config.h"
+ 
+-#define ISCSIADM_NAMESPACE	"ISCSIADM_ABSTRACT_NAMESPACE"
++#define ISCSIADM_NAMESPACE	"snap.microstack.ISCSIADM_ABSTRACT_NAMESPACE"
+ #define PEERUSER_MAX		64
+ 
+ typedef enum iscsiadm_cmd {
+diff --git a/usr/uip_mgmt_ipc.h b/usr/uip_mgmt_ipc.h
+index 916113d..484e9f5 100644
+--- a/usr/uip_mgmt_ipc.h
++++ b/usr/uip_mgmt_ipc.h
+@@ -24,7 +24,7 @@
+ #include "initiator.h"
+ #include "transport.h"
+ 
+-#define ISCSID_UIP_NAMESPACE	"ISCSID_UIP_ABSTRACT_NAMESPACE"
++#define ISCSID_UIP_NAMESPACE	"snap.microstack.ISCSID_UIP_ABSTRACT_NAMESPACE"
+ 
+ typedef enum iscsid_uip_cmd {
+ 	ISCSID_UIP_IPC_UNKNOWN			= 0,
+-- 
+2.17.1
+

@@ -1,0 +1,12 @@
+#!/bin/bash
+
+set -ex
+
+# If we are not running in any type of a container, attempt to load the necessary kernel modules and
+# expect them to be present based on external arrangements (e.g. they could be specified in a LXD profile).
+# TODO: this file will go away when strict confinement gets implemented as snapd will load modules
+# that are specified in the microstack-support interface.
+if [[ `systemd-detect-virt --container` == 'none' ]]
+then
+    modprobe -a vhost vhost-net vhost-scsi vhost-vsock vfio nbd dm-mod dm-thin-pool dm-snapshot iscsi-tcp target-core-mod
+fi

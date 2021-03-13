@@ -1,0 +1,11 @@
+[uwsgi]
+module = cluster.daemon:app
+uwsgi-socket = {{ snap_common }}/run/cluster-api.sock
+buffer-size = 65535
+master = true
+enable-threads = true
+processes = 2
+thunder-lock = true
+lazy-apps = true
+home = {{ snap }}/usr
+pyargv = {{ pyargv }}

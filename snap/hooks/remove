@@ -1,0 +1,79 @@
+#!/usr/bin/env python3
+
+import os
+import sys
+import logging
+from subprocess import check_call, check_output, call, run
+from pyroute2 import netns
+
+logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
+
+
+if __name__ == '__main__':
+    # Work around the lack of modified LD_LIBRARY_PATH and PATH variables with
+    # snap-specific content.
+    snap_dir = os.environ['SNAP']
+    snap_libs = (f'{snap_dir}/lib:{snap_dir}/usr/lib:'
+                 f'{snap_dir}/lib/x86_64-linux-gnu:'
+                 f'{snap_dir}/usr/lib/x86_64-linux-gnu')
+    os.environ['LD_LIBRARY_PATH'] = snap_libs
+
+    check_call(['snapctl', 'start', 'microstack.ovsdb-server'])
+    check_call(['snapctl', 'start', 'microstack.ovs-vswitchd'])
+
+    logging.info('Attempting to remove br-ex.')
+    check_call(['ovs-vsctl', '--if-exists', 'del-br', 'br-ex'])
+
+    check_call(['snapctl', 'stop', 'microstack.ovsdb-server'])
+    check_call(['snapctl', 'stop', 'microstack.ovs-vswitchd'])
+
+    for ns in netns.listnetns():
+        if ns.startswith('ovnmeta-'):
+            logging.info(f'Removing the {ns} network namespace.')
+            netns.remove(ns)
+
+    # Need to expose targets prior to starting iscsid in order to properly log out
+    # of iSCSI sessions.
+    check_call(['snapctl', 'start', 'microstack.target'])
+    check_call(['snapctl', 'start', 'microstack.iscsid'])
+    check_call(['sync'])
+
+    # Assuming the QEMU processes have already been killed by snapd,
+    # log out of all targets prior to removing the snap to clean up
+    # the kernel state.
+    # TODO: be more selective about logging out since there may be sessions
+    # unrelated to MicroStack in the kernel.
+    # TODO: also clean up block devices by writing to
+    # /sys/class/block/<dev>/device/delete since those do not get deleted on
+    # session logout.
+    logging.info('Attempting to remove iscsi sessions from the kernel.')
+    res = run(['iscsiadm', '-m', 'node', '-u'])
+    # ISCSI_ERR_NO_OBJS_FOUND
+    if res.returncode == 21:
+        logging.debug('No iscsi sessions were found.')
+    elif res.returncode == 0:
+        logging.debug('Successfully logged the existing iscsi sessions out.')
+    else:
+        # Albeit this is an error condition we cannot do much in the remove
+        # hook to fix this besides logging since snapd does not stop the
+        # snap removal on error in the remove hook.
+        logging.error('Unexpected error code received from iscsiadm: '
+                      f'{res.returncode}')
+    check_call(['snapctl', 'stop', 'microstack.iscsid'])
+    check_call(['snapctl', 'stop', 'microstack.target'])
+
+    # File-backed LVM resource cleanup (if present).
+    loop_file = f'{os.environ["SNAP_COMMON"]}/cinder-lvm.img'
+    allocated_loop_dev = check_output(
+            f'losetup -j {loop_file} | cut -d ":" -f 1', shell=True
+    ).decode('utf-8').strip()
+
+    if allocated_loop_dev:
+        cinder_lvm_vg = check_output([
+            'snapctl', 'get', 'config.cinder.lvm-backend-volume-group']
+        ).strip()
+        if not call(['vgdisplay', cinder_lvm_vg]):
+            check_call(['vgremove', '-f', cinder_lvm_vg])
+        if not call(['pvdisplay', allocated_loop_dev]):
+            check_call(['pvremove', '-f', allocated_loop_dev])
+        check_call(['losetup', '-d', allocated_loop_dev])

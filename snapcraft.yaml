@@ -1,0 +1,1613 @@
+name: microstack
+version: ussuri
+base: core20
+summary: OpenStack on your laptop.
+description: |
+  Microstack gives you an easy way to develop and test OpenStack
+  workloads on your laptop.
+grade: devel
+confinement: strict
+environment:
+  LC_ALL: C
+  PATH: $SNAP/usr/sbin:$SNAP/usr/bin:$SNAP/sbin:$SNAP/bin:$SNAP/usr/local/bin:$SNAP/usr/local/sbin:$PATH
+  # OS_PLACEMENT_CONFIG_DIR: $SNAP/etc/nova/
+  # Standard library components must have priority in module name resolution: https://storyboard.openstack.org/#!/story/2007806
+  PYTHONPATH: $PYTHONPATH:/usr/lib/python3.8:/usr/lib/python3/dist-packages:$SNAP/usr/lib/python3.8:$SNAP/lib/python3.8/site-packages:$SNAP/usr/lib/python3/dist-packages
+  PYTHONWARNINGS: ignore
+  # Needed by a targetcli dependency.
+  GI_TYPELIB_PATH: $SNAP/usr/lib/x86_64-linux-gnu/girepository-1.0
+
+system-usernames:
+  snap_daemon: shared
+
+layout:
+  /usr/local/bin:
+    bind: $SNAP/usr/local/bin
+  /usr/lib/$SNAPCRAFT_ARCH_TRIPLET/ceph:
+    bind: $SNAP/usr/lib/$SNAPCRAFT_ARCH_TRIPLET/ceph
+  /usr/lib/$SNAPCRAFT_ARCH_TRIPLET/qemu:
+    bind: $SNAP/usr/lib/$SNAPCRAFT_ARCH_TRIPLET/qemu
+  /usr/lib/$SNAPCRAFT_ARCH_TRIPLET/pulseaudio:
+    bind: $SNAP/usr/lib/$SNAPCRAFT_ARCH_TRIPLET/pulseaudio
+  /usr/lib/libvirt:
+    bind: $SNAP/usr/lib/libvirt
+  /usr/share/libvirt:
+    bind: $SNAP/usr/share/libvirt
+  /usr/share/qemu:
+    bind: $SNAP/usr/share/qemu
+  # Keystone really wants to look here for its fernet keys for some reason
+  /etc/keystone/fernet-keys:
+    bind: $SNAP_COMMON/fernet-keys
+  # Libvirt has a hard-coded path for the apparmor directory.
+  /etc/apparmor.d:
+    bind: $SNAP_COMMON/etc/apparmor.d
+  # os-brick has a hard-coded location for the iscsi initiator name file.
+  /etc/iscsi:
+    bind: $SNAP_COMMON/etc/iscsi
+  # NOTE: /var/target is there since vhost-scsi module is a holder of target-core-mod (see 
+  # the content of /sys/module/target_core_mod/holders). This prevents rtslib from being
+  # able to change the value of /sys/kernel/config/target/dbroot to /etc/target. At the same time,
+  # rtslib saves configuration to /etc/target/saveconfig.json by default. Hence both bind mounts
+  # point to the same target directory.
+  # LIO: the preferred db_root directory documented both in the kernel target code and rtslib.
+  /etc/target:
+    bind: $SNAP_COMMON/etc/target
+  # LIO: the default db_root directory documented both in the kernel target code and rtslib.
+  /var/target:
+    bind: $SNAP_COMMON/etc/target
+  # LIO: Debian targetcli and rtslib carry a patch that changes the preferred dbroot from /etc/target
+  # to /etc/rtslib-fb-target.
+  /etc/rtslib-fb-target:
+    bind: $SNAP_COMMON/etc/target
+apps:
+  # Openstack
+  openstack:
+    command: bin/openstack-wrapper openstack
+    plugs:
+      - network
+      # TODO: - microstack-support
+
+  # A proxy command to avoid calling <namespace>.<command>.
+  # TODO: potentially remove the individual commands completely in favor of this.
+  microstack:
+    command: bin/microstack
+    plugs:
+      - network
+      - mount-observe
+      - network-bind
+      - firewall-control
+      - network-control
+      - ssh-keys
+      - system-observe
+      - hardware-observe
+      # TODO: - microstack-support
+
+  # OpenStack Service Configuration
+  init:
+    command: bin/microstack_init
+    plugs:
+      - network
+      - mount-observe  # rabbitmq-ctl
+      - network-bind  # rabbitmq-ctl?
+      - firewall-control  # iptables
+      - network-control  # iptables
+      - ssh-keys # write ssh key
+      - system-observe  # rabbitmq ?
+      - hardware-observe  # rabbitmq ?
+      # TODO: - microstack-support
+
+  add-compute:
+    command: bin/microstack_add_compute
+    plugs:
+      - network
+
+  # Keystone
+  keystone-uwsgi:
+    command: bin/snap-openstack launch keystone-uwsgi
+    daemon: simple
+    plugs:
+      - network-bind
+      - network
+      - network-control
+      # TODO: - microstack-support
+  keystone-manage:
+    command: bin/snap-openstack launch keystone-manage
+    plugs:
+      - network
+      # TODO: - microstack-support
+
+  nova-api:
+    command: bin/snap-openstack launch nova-api-os-compute
+    daemon: simple
+    plugs:
+      - network
+      - network-bind
+      - network-control
+      # TODO: - microstack-support
+  nova-conductor:
+    command: bin/snap-openstack launch nova-conductor
+    daemon: simple
+    plugs:
+      - network
+      - network-control
+      # TODO: - microstack-support
+  nova-scheduler:
+    command: bin/snap-openstack launch nova-scheduler
+    daemon: simple
+    plugs:
+      - network
+      - network-bind
+      - network-control
+      # TODO: - microstack-support
+  nova-compute:
+    command: bin/snap-openstack launch nova-compute
+    after: [libvirtd]
+    daemon: simple
+    plugs:
+      - network
+      - network-bind
+      - network-control
+      - firewall-control
+      - hardware-observe
+      # TODO: - microstack-support
+      # Needs access to block devices so that blockdev --flushbufs works.
+      - block-devices
+  nova-api-metadata:
+    command: bin/snap-openstack launch nova-api-metadata
+    daemon: simple
+    plugs:
+      - network
+      - network-bind
+      - firewall-control
+      # TODO: - microstack-support
+  nova-manage:
+    command: bin/snap-openstack launch nova-manage
+    plugs:
+      - network
+      # TODO: - microstack-support
+  nova-spicehtml5proxy:
+    command: bin/snap-openstack launch nova-spicehtml5proxy
+    daemon: simple
+    plugs:
+      - network
+      - network-bind
+      - network-control
+      # TODO: - microstack-support
+  # Neutron
+  neutron-api:
+    command: bin/snap-openstack launch neutron-server
+    daemon: simple
+    plugs:
+      - network
+      - network-bind
+      - network-control
+      # TODO: - microstack-support
+  neutron-ovn-metadata-agent:
+    command: bin/snap-openstack launch neutron-ovn-metadata-agent
+    daemon: simple
+    plugs:
+      - network
+      - network-bind
+      - network-control
+      - network-observe
+      # TODO: - microstack-support
+  neutron-ovs-cleanup:
+    command: bin/snap-openstack launch neutron-ovs-cleanup
+    plugs:
+      - network
+      - network-control
+      # TODO: - microstack-support
+  # NOTE(dmitriis): Upstream Neutron does not support cleaning up ovnmeta-<uuid> namespaces
+  # as of Ussuri which is a bug.
+  neutron-netns-cleanup:
+    command: bin/snap-openstack launch neutron-netns-cleanup
+    plugs:
+      - network
+      - network-control
+      # TODO: - microstack-support
+  neutron-db-manage:
+    command: bin/snap-openstack launch neutron-db-manage
+    plugs:
+      - network
+      # TODO: - microstack-support
+
+  # Glance
+  glance-api:
+    command: bin/snap-openstack launch glance-api
+    daemon: simple
+    plugs:
+      - network
+      - network-bind
+      - mount-observe
+      - network-control
+      # TODO: - microstack-support
+  registry:
+    command: bin/snap-openstack launch glance-registry
+    daemon: simple
+    plugs:
+      - network
+      - network-bind
+      - network-control
+      # TODO: - microstack-support
+  glance-manage:
+    command: bin/snap-openstack launch glance-manage
+    plugs:
+      - network
+      # TODO: - microstack-support
+
+  # Placement
+  placement-uwsgi:
+    command: bin/snap-openstack launch placement-uwsgi
+    daemon: simple
+    plugs:
+      - network
+      - network-bind
+      - mount-observe
+      - network-control
+      # TODO: - microstack-support
+
+  placement-manage:
+    command: bin/snap-openstack launch placement-manage
+    plugs:
+      - network
+      # TODO: - microstack-support
+
+  # Openstack Shared Services
+  nginx:
+    command: bin/snap-openstack launch nginx
+    daemon: forking
+    plugs:
+      - network
+      - network-bind
+      # TODO: - microstack-support
+
+  # Openvswitch
+  ovs-vswitchd:
+    command: bin/ovs-wrapper $SNAP/usr/local/share/openvswitch/scripts/ovs-ctl --no-ovsdb-server --no-monitor start
+    stop-command: bin/ovs-wrapper $SNAP/usr/local/share/openvswitch/scripts/ovs-ctl --no-ovsdb-server stop
+    after: [ovsdb-server]
+    daemon: forking
+    plugs:
+      - network
+      - network-bind
+      - network-control
+      # NETLINK_NETFILTER SOCK_RAW sockets
+      - firewall-control
+      - openvswitch-support
+      - process-control
+      - system-trace
+      - hardware-observe
+      - hugepages-control
+      # TODO: - microstack-support
+  ovsdb-server:
+    command: bin/ovs-wrapper $SNAP/usr/local/share/openvswitch/scripts/ovs-ctl --no-ovs-vswitchd --no-monitor start
+    stop-command: bin/ovs-wrapper $SNAP/usr/local/share/openvswitch/scripts/ovs-ctl --no-ovs-vswitchd stop
+    daemon: forking
+    plugs:
+      - network
+      - network-bind
+      - network-control
+      - openvswitch-support
+      - process-control
+      - system-trace
+      # TODO: - microstack-support
+  ovn-ovsdb-server-nb:
+    command: bin/ovn-wrapper $SNAP/usr/local/share/ovn/scripts/ovn-ctl start_nb_ovsdb
+    stop-command: bin/ovn-wrapper $SNAP/usr/local/share/ovn/scripts/ovn-ctl stop_nb_ovsdb
+    daemon: forking
+    plugs:
+      - network
+      - network-bind
+      - network-control
+      - openvswitch-support
+      - process-control
+      - system-trace
+      # TODO: - microstack-support
+  ovn-ovsdb-server-sb:
+    command: bin/ovn-wrapper $SNAP/usr/local/share/ovn/scripts/ovn-ctl start_sb_ovsdb
+    stop-command: bin/ovn-wrapper $SNAP/usr/local/share/ovn/scripts/ovn-ctl stop_sb_ovsdb
+    daemon: forking
+    plugs:
+      - network
+      - network-bind
+      - network-control
+      - openvswitch-support
+      - process-control
+      - system-trace
+      # TODO: - microstack-support
+  ovn-northd:
+    command: bin/ovn-wrapper $SNAP/usr/local/share/ovn/scripts/ovn-ctl start_northd
+    stop-command: bin/ovn-wrapper $SNAP/usr/local/share/ovn/scripts/ovn-ctl stop_northd
+    daemon: forking
+    plugs:
+      - network
+      - network-bind
+      - network-control
+      - openvswitch-support
+      - process-control
+      - system-trace
+      # TODO: - microstack-support
+    after:
+      - ovn-ovsdb-server-nb
+      - ovn-ovsdb-server-sb
+  ovn-controller:
+    command: bin/ovn-wrapper $SNAP/usr/local/share/ovn/scripts/ovn-ctl start_controller
+    stop-command: bin/ovn-wrapper $SNAP/usr/local/share/ovn/scripts/ovn-ctl stop_controller
+    daemon: forking
+    plugs:
+      - network
+      - network-bind
+      - network-control
+      - openvswitch-support
+      - process-control
+      - system-trace
+      # TODO: - microstack-support
+    after:
+      - ovsdb-server
+      - ovs-vswitchd
+
+  ovn-appctl:
+    command: bin/ovn-wrapper $SNAP/usr/local/bin/ovn-appctl
+    plugs:
+      - network
+      - network-bind
+      # TODO: - microstack-support
+  ovn-trace:
+    command: bin/ovn-wrapper $SNAP/usr/local/bin/ovn-trace
+    plugs:
+      - network
+      - network-bind
+      # TODO: - microstack-support
+  ovn-detrace:
+    command: bin/ovn-wrapper $SNAP/usr/local/bin/ovn-detrace
+    plugs:
+      - network
+      - network-bind
+      # TODO: - microstack-support
+  ovn-nbctl:
+    command: bin/ovn-wrapper $SNAP/usr/local/bin/ovn-nbctl
+    plugs:
+      - network
+      - network-bind
+      # TODO: - microstack-support
+  ovn-sbctl:
+    command: bin/ovn-wrapper $SNAP/usr/local/bin/ovn-sbctl
+    plugs:
+      - network
+      - network-bind
+      - process-control
+      # TODO: - microstack-support
+
+  ovs-vsctl:
+    command: bin/ovs-wrapper $SNAP/usr/local/bin/ovs-vsctl
+    plugs:
+      - network
+      - process-control
+      # TODO: - microstack-support
+  ovs-appctl:
+    command: bin/ovs-wrapper $SNAP/usr/local/bin/ovs-appctl
+    plugs:
+      - network
+      - process-control
+      # TODO: - microstack-support
+  ovs-ofctl:
+    command: bin/ovs-wrapper $SNAP/usr/local/bin/ovs-ofctl
+    plugs:
+      - network
+      - process-control
+      # TODO: - microstack-support
+  ovs-dpctl:
+    command: bin/ovs-wrapper $SNAP/usr/local/bin/ovs-dpctl
+    plugs:
+      - network
+      - process-control
+      # TODO: - microstack-support
+
+  external-bridge:
+    command: bin/wait-on-init setup-br-ex
+    daemon: oneshot
+    after: [ovs-vswitchd]
+    plugs:
+      - network
+      - network-control
+      - process-control
+      # TODO: - microstack-support
+
+  # Libvirt/Qemu
+  libvirtd:
+    command: usr/sbin/libvirtd --pid $SNAP_DATA/libvirt.pid
+    daemon: simple
+    plugs:
+      - network
+      - network-bind
+      - network-control
+      - netlink-connector
+      - netlink-audit
+      - libvirt
+      - opengl
+      - raw-usb
+      - hardware-observe
+      - hugepages-control
+      - kvm
+      - kernel-module-observe
+      - process-control
+      - mount-observe
+      - block-devices
+      # TODO: - microstack-support
+    # Make sure KillMode=process is set in the resulting systemd unit instead of
+    # the default KillMode=control-group to avoid the situation where stopping
+    # libvirtd causes the forced power off scenario for all VMs; it also affects
+    # snap refreshes as libvirtd is restarted in this case.
+    # Removing the snap will still result in VMs being forcefully powered off which
+    # is intended.
+    stop-mode: sigterm
+
+  virtlogd:
+    command: usr/sbin/virtlogd --pid $SNAP_DATA/virtlogd.pid
+    daemon: simple
+    plugs:
+      - network
+      - network-bind
+      - network-control
+      # TODO: - microstack-support
+  virsh:
+    command: usr/bin/virsh
+    plugs:
+      - network
+      # TODO: - microstack-support
+
+  # MySQL
+  mysqld:
+    command: bin/mysql-start-server
+    daemon: simple
+    plugs:
+      - process-control
+      - network
+      - network-bind
+      # TODO: - microstack-support
+  mysql:
+    command: bin/mysql-start-client
+    plugs:
+      - process-control
+      - network
+      # TODO: - microstack-support
+
+  # RabbitMQ
+  rabbitmq-server:
+    command: usr/sbin/rabbitmq-server
+    daemon: simple
+    plugs:
+      - network-bind
+      - network
+      - mount-observe
+      - log-observe
+      # TODO: - microstack-support
+    environment:
+      HOME: $SNAP_COMMON/lib/rabbitmq
+  rabbitmqctl:
+    command: usr/sbin/rabbitmqctl
+    plugs:
+      - network
+      - mount-observe
+      # TODO: - microstack-support
+    environment:
+      HOME: $SNAP_COMMON/lib/rabbitmq
+  rabbitmq-plugins:
+    command: usr/sbin/rabbitmq-plugins
+    environment:
+      HOME: $SNAP_COMMON/lib/rabbitmq
+      # TODO: - microstack-support
+
+  # Memcached
+  memcached:
+    command: usr/bin/memcached -u root -v
+    daemon: simple
+    plugs:
+      - network
+      - network-bind
+      # TODO: - microstack-support
+
+  # Cinder
+  cinder-uwsgi:
+    command: bin/snap-openstack launch cinder-uwsgi
+    daemon: simple
+    plugs:
+      - network
+      - network-bind
+      # TODO: - microstack-support
+  cinder-backup:
+    command: bin/snap-openstack launch cinder-backup
+    daemon: simple
+    plugs:
+      - network
+      - mount-observe
+      # TODO: - microstack-support
+  cinder-manage:
+    command: bin/snap-openstack launch cinder-manage
+    plugs:
+      - network
+      - mount-observe
+      # TODO: - microstack-support
+  cinder-scheduler:
+    command: bin/snap-openstack launch cinder-scheduler
+    daemon: simple
+    plugs:
+      - network
+      - mount-observe
+      # TODO: - microstack-support
+  cinder-volume:
+    command: bin/snap-openstack launch cinder-volume
+    daemon: simple
+    plugs:
+      - network
+      - network-bind
+      - mount-observe
+      - block-devices
+      # setpriority by LVM tools.
+      - process-control
+      # TODO: - microstack-support
+    after:
+      - setup-lvm-loopdev
+
+  # Restores LIO kernel target configuration.
+  target:
+    command: bin/target-start
+    stop-command: bin/target-stop
+    daemon: oneshot
+    plugs:
+      - network
+      - network-bind
+      - mount-observe
+      - block-devices
+      # TODO: - microstack-support
+    after:
+      - setup-lvm-loopdev
+    environment:
+      TARGETCLI_HOME: $SNAP_USER_COMMON/.targetcli
+
+  iscsid:
+    command: bin/iscsid-start
+    daemon: forking
+    plugs:
+      - network
+      - network-bind
+      # NETLINK_ISCSI protocol sockets
+      - network-control
+      # TODO: - microstack-support
+      - block-devices
+      - process-control
+    after:
+      # Make sure iscsid is stopped before target configuration is cleaned up.
+      - target
+
+  # TODO: this is a --devmode workaround since the microstack-support interface is not merged yet.
+  load-modules:
+    command: bin/load-modules
+    daemon: oneshot
+    plugs:
+      - kernel-module-control
+
+  setup-lvm-loopdev:
+    command: bin/setup-lvm-loopdev
+    daemon: oneshot
+    plugs:
+      - network
+      - block-devices
+      - mount-observe
+      # loop device control etc.
+      # LVM tools use setpriority to set it to -18 which is prohibited in the default snapd templates.
+      - process-control
+      # TODO: - microstack-support
+    after:
+      - load-modules
+
+  # Horizon
+  horizon-uwsgi:
+    command: bin/snap-openstack launch horizon-uwsgi
+    daemon: simple
+    plugs:
+      - network
+      - network-bind
+      # TODO: - microstack-support
+
+  # Utility to launch a vm. Creates security groups, floating ips,
+  # and other necessities as well.
+  launch:
+    command: bin/microstack_launch
+    plugs:
+      - network
+      - network-control  # could also be mount-observe
+      # TODO: - microstack-support
+
+  # Cluster
+  cluster-uwsgi:
+    command: bin/snap-openstack launch cluster-uwsgi
+    daemon: simple
+    plugs:
+      - network
+      - network-bind
+      # TODO: - microstack-support
+
+  telegraf:
+    command: bin/telegraf
+    daemon: simple
+
+  filebeat:
+  # this is to avoid conflict with filebeat package
+    command: bin/filebeat
+    daemon: simple
+
+  nrpe:
+    command: bin/nrpe
+    daemon: simple
+
+parts:
+  # Add Ubuntu Cloud Archive sources.
+  # Allows us to fetch things such as updated libvirt.
+  uca-sources:
+    plugin: nil
+    build-packages:
+      - ubuntu-cloud-keyring
+      - software-properties-common
+      - dpkg-dev  # We'll need to manipulate sources later.
+        #stage-packages:
+      # The two dependencies below are added to avoid errors during
+      # the build step of the openstack-projects part (see LP: #1864589).
+      - python3-dev
+      - python3-distutils
+    override-build: |
+      # add-apt-repository -s cloud-archive:ussuri
+      # apt-key update
+      # apt update
+      snapcraftctl build
+
+  # OpenStack Python Projects, keyed off Keystone
+  openstack-projects:
+    plugin: python
+    # python-version: python3
+    after:
+      - uca-sources
+      - libvirt
+      - patches
+    constraints:
+      - ${SNAPCRAFT_STAGE}/patches/upper-constraints.txt
+    source: http://tarballs.openstack.org/keystone/keystone-stable-ussuri.tar.gz
+    build-packages:
+      - gcc
+      - git
+      - libffi-dev
+      - libssl-dev
+      - libxml2-dev
+      - libxslt1-dev
+      - python3-dev
+      - libsystemd-dev
+    stage-packages:
+      - procps  # sysctl utility is used by Neutron agents.
+      - conntrack
+      - coreutils
+      - haproxy
+      - libmagic1
+      - petname
+      - libsystemd0
+      - libpython3.8
+      - spice-html5
+      - sg3-utils
+      # LIO userspace dependencies
+      # Will also pull rtslib-fb to work with ConfigFS.
+      - targetcli-fb
+    python-packages:
+      - wheel
+      - libvirt-python
+      - oslo.cache[dogpile]
+      - pymysql
+      - uwsgi
+      - git+https://opendev.org/x/snap.openstack#egg=snap.openstack
+      - nova==21.1.1
+      - neutron===16.2.0
+      - glance==20.0.1
+      - cinder==16.2.1
+      - openstack-placement==3.0.0
+      - horizon==18.3.2
+      - python-cinderclient
+      - python-openstackclient
+      - python-swiftclient
+      # Workaround for https://bugs.launchpad.net/snapcraft/+bug/1860768
+      # This is a package required for the launch script, per the bug
+      # above. We include it here so that we don't try to rebuild dist
+      # stuff:
+      - petname
+      - systemd-python
+      # Used by spice-html5 proxy.
+      - websockify
+      # For debugging purposes.
+      - rpdb
+    build-environment: &python-build-environment
+      - PIP_COMPILE: 'false'  # disable .pyc generation in pip
+      - PYTHONDONTWRITEBYTECODE: 'false'  # disable .pyc generation by setup.py
+      - SOURCE_DATE_EPOCH: '1591640328'
+    override-prime: |
+      snapcraftctl prime
+      # Patch Openstack Dashboard (horizon) settings files.
+      for patch in ${SNAPCRAFT_STAGE}/patches/horizon/*.patch; do
+        echo "Applying $(basename "$patch") ..."
+        patch \
+          --batch \
+          --forward \
+          --strip 1 \
+          --input "$patch"
+        echo
+      done
+      # Now that everything is built, let's disable user site-packages
+      # as stated in PEP-0370
+      # sed -i usr/lib/python3.8/site.py -e 's/^ENABLE_USER_SITE = None$/ENABLE_USER_SITE = False/'
+      # Uncomment the below line for better python-libvirt debugging output.
+      # patch --batch --forward --strip 1 --input ../project/patches/nova/nova_log_error.patch
+    organize:
+      lib/python3.8/site-packages/openstack_dashboard/local/local_settings.py.example: lib/python3.8/site-packages/openstack_dashboard/local/local_settings.py
+    override-build: |
+      snapcraftctl build
+      rm $SNAPCRAFT_PART_INSTALL/pyvenv.cfg
+          --strip 1 \
+          --input "$patch"
+        echo
+      done
+      # Now that everything is built, let's disable user site-packages
+      # as stated in PEP-0370
+      # sed -i usr/lib/python3.8/site.py -e 's/^ENABLE_USER_SITE = None$/ENABLE_USER_SITE = False/'
+      # Uncomment the below line for better python-libvirt debugging output.
+      # patch --batch --forward --strip 1 --input ../project/patches/nova/nova_log_error.patch
+    organize:
+      lib/python3.8/site-packages/openstack_dashboard/local/local_settings.py.example: lib/python3.8/site-packages/openstack_dashboard/local/local_settings.py
+    override-build: |
+      snapcraftctl build
+      rm $SNAPCRAFT_PART_INSTALL/pyvenv.cfg
+      rm $SNAPCRAFT_PART_INSTALL/bin/activate
+      rm $SNAPCRAFT_PART_INSTALL/bin/activate.csh
+      rm $SNAPCRAFT_PART_INSTALL/bin/activate.fish
+      # see LP: #1882994
+      rm $SNAPCRAFT_PART_INSTALL/bin/python3
+      rm $SNAPCRAFT_PART_INSTALL/bin/python
+
+  keystone-config:
+    after: [openstack-projects]
+    plugin: dump
+    source: http://tarballs.openstack.org/keystone/keystone-stable-ussuri.tar.gz
+    organize:
+      etc/*.conf: etc/keystone/
+      etc/*.ini: etc/keystone/
+      etc/*.json: etc/keystone/
+      etc/*.templates: etc/keystone/
+
+    filesets:
+      etc:
+        - etc/keystone/*
+    stage: [$etc]
+    prime: [$etc]
+
+  openstack-wrapper:
+    source: ./snap-wrappers/openstack
+    plugin: dump
+    after:
+      - openstack-projects
+    organize:
+      openstack-wrapper: bin/openstack-wrapper
+
+  init-wrapper:
+    source: ./snap-wrappers/init
+    plugin: dump
+    organize:
+      wait-on-init: bin/wait-on-init
+
+  nova-config:
+    after: [openstack-projects]
+    plugin: dump
+    source: http://tarballs.openstack.org/nova/nova-stable-ussuri.tar.gz
+    filesets:
+      etc:
+        - etc/nova/*
+    stage: [$etc]
+    prime: [$etc]
+
+  glance-config:
+    after: [openstack-projects]
+    plugin: dump
+    source: http://tarballs.openstack.org/glance/glance-stable-ussuri.tar.gz
+    organize:
+      etc/*.conf: etc/glance/
+      etc/*.ini: etc/glance/
+      etc/*.json: etc/glance/
+    filesets:
+      etc:
+        - etc/glance/*
+    stage: [$etc]
+    prime: [$etc]
+
+  placement-config:
+    after: [openstack-projects]
+    plugin: dump
+    source: http://tarballs.openstack.org/placement/placement-stable-ussuri.tar.gz
+    organize:
+      etc/*.conf: etc/placement/
+      etc/*.ini: etc/placement/
+      etc/*.json: etc/placement/
+    filesets:
+      etc:
+        - etc/placement/*
+    stage: [$etc]
+    prime: [$etc]
+
+  cinder-config:
+    after: [openstack-projects]
+    plugin: dump
+    source: http://tarballs.openstack.org/cinder/cinder-stable-ussuri.tar.gz
+    organize:
+      etc/*.conf: etc/cinder/
+      etc/*.ini: etc/cinder/
+      etc/*.json: etc/cinder/
+      etc/*.templates: etc/cinder/
+    filesets:
+      etc:
+        - etc/cinder/*
+    stage: [$etc]
+    prime: [$etc]
+
+  horizon-config:
+    after: [openstack-projects]
+    plugin: dump
+    source: http://tarballs.openstack.org/horizon/horizon-stable-ussuri.tar.gz
+    organize:
+      etc/*.conf: etc/horizon/
+    filesets:
+      etc:
+        - etc/horizon/*
+    stage: [$etc]
+    prime: [$etc]
+
+  # Snap patches
+  patches:
+    after:
+      - uca-sources
+    source: patches/
+    plugin: dump
+    build-packages:
+      - curl
+    override-build: |
+      # Create ${SNAPCRAFT_STAGE}/patches/upper-constraints
+      # Fetch upstream file
+      curl https://raw.githubusercontent.com/openstack/requirements/stable/ussuri/upper-constraints.txt --output ./upper-constraints.txt
+      snapcraftctl build
+    organize:
+      '*' : patches/
+    prime:
+      - -*
+
+  openvswitch:
+    source: https://github.com/openvswitch/ovs/archive/v2.14.0.tar.gz
+    plugin: autotools
+    build-packages:
+      - autoconf
+      - binutils
+      - bsdmainutils
+      - build-essential
+      - gettext
+      - git
+      - libarchive-zip-perl
+      - libcap-ng-dev
+      - libpcap-dev
+      - on arm64:
+        - libnuma-dev
+      - on ppc64el:
+        - libnuma-dev
+      - on amd64:
+        - libnuma-dev
+      - libssl-dev
+      - libtimedate-perl
+      - libtool
+      - libunbound-dev
+      - pkg-config
+      - python-all-dev
+      - python-setuptools
+      - python3-all-dev
+      - python3-setuptools
+      - python3-sphinx
+      - sphinx-common
+      - zlib1g-dev
+    stage-packages:
+      - libevent-2.1-7
+      - kmod
+      - libcap-ng0
+      - libssl1.1
+      - libunbound8
+      - netbase
+      - ethtool
+      - procps
+      - uuid-runtime
+    autotools-configure-parameters:
+      - "--localstatedir=/var/snap/$SNAPCRAFT_PROJECT_NAME/common"
+      - "--sysconfdir=/var/snap/$SNAPCRAFT_PROJECT_NAME/etc"
+    after:
+      - patches
+    override-build: |
+      snapcraftctl build
+      tar -cvzf $SNAPCRAFT_STAGE/openvswitch.tar.gz .
+
+  ovs-wrapper:
+    source: ./snap-wrappers/ovs
+    plugin: dump
+    after:
+      - openvswitch
+    organize:
+      ovs-wrapper: bin/ovs-wrapper
+      # Nova os-vif code makes libvirt plug a VM interface into an integration bridge
+      # which relies on ovs-vsctl execution. Since we use modified paths, some environment
+      # variables need to be set.
+      ovs-vsctl: bin/ovs-vsctl
+
+  ovn:
+    after: [openvswitch, patches]
+    source: https://github.com/ovn-org/ovn/archive/v20.03.0.tar.gz
+    plugin: autotools
+    autotools-configure-parameters:
+      - --sysconfdir=/var/snap/$SNAPCRAFT_PROJECT_NAME/common/etc
+      - --localstatedir=/var/snap/$SNAPCRAFT_PROJECT_NAME/common/var
+      - --with-ovs-source=$SNAPCRAFT_PART_BUILD/openvswitch
+    override-pull: |
+      snapcraftctl pull
+      rm -rf openvswitch
+      mkdir openvswitch
+      tar -C openvswitch -xvzf $SNAPCRAFT_STAGE/openvswitch.tar.gz
+      rm -f $SNAPCRAFT_STAGE/openvswitch.tar.gz
+    override-build: |
+      snapcraftctl build
+    build-packages:
+      - autoconf
+      - binutils
+      - build-essential
+      - git
+      - libssl-dev
+      - libtool
+      - python3-all-dev
+      - sphinx-common
+    stage-packages:
+      - libevent-2.1-7
+      - libunbound8
+    organize:
+      snap/$SNAPCRAFT_PROJECT_NAME/current/share: /share
+    filesets:
+      exclude-duplicate-manpages:
+        - -share/man/man*/ovsdb*
+        - -usr/local/share/man/man*/ovsdb*
+    stage:
+      - $exclude-duplicate-manpages
+    prime:
+      - $exclude-duplicate-manpages
+
+  ovn-wrapper:
+    source: ./snap-wrappers/ovn
+    plugin: dump
+    after:
+      - ovn
+    organize:
+      ovn-wrapper: bin/ovn-wrapper
+
+  nginx:
+    source: http://www.nginx.org/download/nginx-1.19.0.tar.gz
+    plugin: autotools
+    autotools-configure-parameters:
+      - --prefix=/usr
+      - "--http-log-path=/var/snap/$SNAPCRAFT_PROJECT_NAME/common/log/nginx-access.log"
+      - "--error-log-path=/var/snap/$SNAPCRAFT_PROJECT_NAME/common/log/nginx-error.log"
+      - "--lock-path=/var/snap/$SNAPCRAFT_PROJECT_NAME/common/lock/nginx.lock"
+      - "--pid-path=/var/snap/$SNAPCRAFT_PROJECT_NAME/common/run/nginx.pid"
+      - "--http-client-body-temp-path=/var/snap/$SNAPCRAFT_PROJECT_NAME/common/lib/nginx_client_body"
+      - "--http-proxy-temp-path=/var/snap/$SNAPCRAFT_PROJECT_NAME/common/lib/nginx_proxy"
+      - "--http-fastcgi-temp-path=/var/snap/$SNAPCRAFT_PROJECT_NAME/common/lib/nginx_fastcgi"
+      - "--http-uwsgi-temp-path=/var/snap/$SNAPCRAFT_PROJECT_NAME/common/lib/nginx_uwsgi"
+      - "--http-scgi-temp-path=/var/snap/$SNAPCRAFT_PROJECT_NAME/common/lib/nginx_scgi"
+      - --with-http_ssl_module
+    build-packages:
+      - libpcre3-dev
+      - libssl-dev
+      - python-six
+    override-build: |
+      # Apply patches
+      for patch in ${SNAPCRAFT_STAGE}/patches/nginx/*.patch; do
+        echo "Applying $(basename "$patch") ..."
+        patch \
+          --batch \
+          --forward \
+          --strip 1 \
+          --input "$patch"
+        echo
+      done
+      snapcraftctl build
+
+
+  # libvirt/qemu
+  qemu:
+    source: https://git.launchpad.net/ubuntu/+source/qemu
+    source-type: git
+    source-branch: ubuntu/focal-updates
+    plugin: autotools
+    after:
+      - uca-sources
+    build-environment:
+      # Workaround for https://bugs.launchpad.net/snapcraft/+bug/1860766
+      - LD_LIBRARY_PATH: $SNAPCRAFT_PART_INSTALL/usr/lib/$SNAPCRAFT_ARCH_TRIPLET/ceph:$SNAPCRAFT_PART_INSTALL/usr/lib/$SNAPCRAFT_ARCH_TRIPLET/pulseaudio:$LD_LIBRARY_PATH
+    stage-packages:
+      - seabios
+      - ipxe-qemu
+      - freeglut3 # provides libglut.so.3
+      - libnuma1
+      - libspice-server1
+      - libasound2
+      - libasyncns0
+      - libbluetooth3
+      - libboost-iostreams1.67.0
+      - libboost-random1.67.0
+      - libboost-system1.67.0
+      - libboost-thread1.67.0
+      - libcaca0
+      - libfdt1
+      - libflac8
+      - libglu1-mesa
+      - libiscsi7
+      - libjpeg-turbo8
+      - libnspr4
+      - libnss3
+      - libogg0
+      - libopus0
+      - libpixman-1-0
+      - libpulse0
+      - librados2
+      - librbd1
+      - libsdl1.2debian
+      - libslang2
+      - libsndfile1
+      - libusb-1.0-0
+      - libusbredirparser1
+      - libvorbis0a
+      - libvorbisenc2
+      - libx11-6
+      - libxi6
+      - libxau6
+      - libxcb1
+      - libxdmcp6
+      - libxext6
+      - libpng16-16
+      - libaio1
+      - libasn1-8-heimdal
+      - libbrotli1
+      - libcurl3-gnutls
+      - libgssapi3-heimdal
+      - libhcrypto4-heimdal
+      - libheimbase1-heimdal
+      - libheimntlm0-heimdal
+      - libhx509-5-heimdal
+      - libkrb5-26-heimdal
+      - libldap-2.4-2
+      - libnghttp2-14
+      - libpsl5
+      - libroken18-heimdal
+      - librtmp1
+      - libssh-4
+      - libwind0-heimdal
+    build-packages:
+      - acpica-tools
+      - libaio-dev
+      - libasound2-dev
+      - libattr1-dev
+      - libbluetooth-dev
+      - libcap-dev
+      - libcap-ng-dev
+      - libcurl4-gnutls-dev
+      - libfdt-dev
+      - gnutls-dev
+      - libiscsi-dev
+      - libncurses5-dev
+      - try: [libnuma-dev]
+      - libpixman-1-dev
+      - libpulse-dev
+      - librados-dev
+      - librbd-dev
+      - libsasl2-dev
+      - libsdl1.2-dev
+      - try: [libspice-server-dev, libspice-protocol-dev]
+      - libusb-1.0-0-dev
+      - libusbredirparser-dev
+      - linux-libc-dev
+      - uuid-dev
+      - xfslibs-dev
+      - libjpeg-dev
+      - zlib1g-dev
+      - libpng-dev
+      - wget
+      - dpkg-dev
+      - gcc
+    autotools-configure-parameters:
+      - --disable-blobs
+      - --prefix=/usr
+      - --localstatedir=/var/snap/$SNAPCRAFT_PROJECT_NAME/common
+      - --sysconfdir=/var/snap/$SNAPCRAFT_PROJECT_NAME/common
+      - --firmwarepath=/snap/$SNAPCRAFT_PROJECT_NAME/current/usr/share/seabios:/snap/$SNAPCRAFT_PROJECT_NAME/current/usr/share/qemu:/snap/$SNAPCRAFT_PROJECT_NAME/current/usr/lib/ipxe/qemu
+      - --disable-user
+      - --disable-linux-user
+      - --disable-bsd-user
+      - --disable-vhost-user
+      - --enable-system
+      - --target-list=x86_64-softmmu
+      - --disable-xen
+    override-build: |
+      dpkg-source --before-build .
+      snapcraftctl build
+
+  kvm-support:
+    plugin: nil
+    stage-packages:
+    - try: [msr-tools]
+
+  libvirt:
+    source: https://git.launchpad.net/ubuntu/+source/libvirt
+    source-type: git
+    source-branch: ubuntu/focal-updates
+    source-subdir: build-subdir
+    after:
+      - qemu
+      - uca-sources
+    plugin: autotools
+    build-packages:
+    - libxml2-dev
+    - libxml-libxml-perl
+    - libcurl4-gnutls-dev
+    - libncurses5-dev
+    - libreadline-dev
+    - zlib1g-dev
+    - libgcrypt20-dev
+    - libgnutls28-dev
+    - libyajl-dev
+    - libpcap0.8-dev
+    - libaudit-dev
+    - libdevmapper-dev
+    - libpciaccess-dev
+    - libnl-3-dev
+    - libnl-route-3-dev
+    - libxml2-utils
+    - uuid-dev
+    - try: [libnuma-dev]
+    - python-all
+    - python-six
+    - wget
+    - dpkg-dev
+    - xsltproc
+    - libapparmor-dev
+    - rsync
+    - open-iscsi
+    stage-packages:
+    - dmidecode
+    - dnsmasq
+    - iptables
+    - genisoimage
+    - libxml2
+    - libyajl2
+    - try: [libnuma1]
+    - libcurl3-gnutls
+    - libpcap0.8
+    - libpciaccess0
+    # libvirt uses the pm-is-supported tool.
+    - pm-utils
+    - ebtables
+    - apparmor
+    - libapparmor1
+    autotools-configure-parameters:
+    - --with-qemu
+    - --without-bhyve
+    - --without-xen
+    - --without-openvz
+    - --without-vmware
+    - --without-xenapi
+    - --without-esx
+    - --without-hyperv
+    - --without-lxc
+    - --without-vz
+    - --without-vbox
+    - --without-uml
+    - --without-sasl
+    - --without-storage-iscsi
+    - --without-storage-sheepdog
+    - --without-storage-rbd
+    - --without-storage-lvm
+    - --without-selinux
+    - --with-chrdev-lock-files=/run/lock
+    - --with-storage-iscsi
+    # TODO(dmitriis): re-enable once a workaround is found for subprocess' RPATH handling.
+    # - --with-apparmor
+    - --without-apparmor
+    # NOTE: the install prefix will be different from the actual location on snap installation.
+    - --prefix=/usr
+    - --bindir=/snap/$SNAPCRAFT_PROJECT_NAME/current/usr/bin
+    - --sbindir=/snap/$SNAPCRAFT_PROJECT_NAME/current/usr/sbin
+    - --libexecdir=/snap/$SNAPCRAFT_PROJECT_NAME/current/usr/libexec
+    - --libdir=/snap/$SNAPCRAFT_PROJECT_NAME/current/usr/lib
+    - --includedir=/snap/$SNAPCRAFT_PROJECT_NAME/current/usr/include
+    - --oldincludedir=/snap/$SNAPCRAFT_PROJECT_NAME/current/usr/include
+    - --localstatedir=/var/snap/$SNAPCRAFT_PROJECT_NAME/common
+    - --sysconfdir=/var/snap/$SNAPCRAFT_PROJECT_NAME/common/etc/
+    - DNSMASQ=/snap/$SNAPCRAFT_PROJECT_NAME/current/usr/sbin/dnsmasq
+    - DMIDECODE=/snap/$SNAPCRAFT_PROJECT_NAME/current/usr/sbin/dmidecode
+    - OVSVSCTL=/snap/$SNAPCRAFT_PROJECT_NAME/current/usr/local/bin/ovs-vsctl
+    - IPTABLES_PATH=/snap/$SNAPCRAFT_PROJECT_NAME/current/usr/sbin/iptables-legacy
+    - IP6TABLES_PATH=/snap/$SNAPCRAFT_PROJECT_NAME/current/usr/sbin/ip6tables-legacy
+    - EBTABLES_PATH=/snap/$SNAPCRAFT_PROJECT_NAME/current/usr/sbin/ebtables-legacy
+    build-environment:
+      # Libraries under /snap/$SNAPCRAFT_PROJECT_NAME/current/usr/lib/x86_64-linux-gnu are not added to the
+      # runpath by default. This is OK for parent processes which get LD_LIBRARY_PATH set properly but not
+      # for the child processes they spawn since the environment variables are not passed down to children by default after execve(2).
+      # `readelf -d /snap/microstack/current/usr/libexec/virt-aa-helper` should return something like:
+      # (RUNPATH)            Library runpath: [/snap/microstack/current/usr/lib:/snap/microstack/current/usr/lib/x86_64-linux-gnu:...]
+      - LDFLAGS: '$LDFLAGS -Wl,-rpath=/snap/$SNAPCRAFT_PROJECT_NAME/current/usr/lib -Wl,-rpath=/snap/$SNAPCRAFT_PROJECT_NAME/current/usr/lib/x86_64-linux-gnu -Wl,-rpath=/snap/$SNAPCRAFT_PROJECT_NAME/current/lib -Wl,-rpath=/lib/x86_64-linux-gnu -Wl,-rpath=/lib/'
+    override-build: |
+      dpkg-source --before-build .
+      logger `echo -n $PWD`
+      # Prevent libvirt from attempting to run setgroups
+      echo "
+
+      #undef HAVE_SETGROUPS
+      #undef HAVE_SETEUID
+      " >> config-post.h
+
+      # See https://bugs.launchpad.net/snapcraft/+bug/1882255
+      mkdir build-subdir
+      cd build-subdir
+      ../autogen.sh
+
+      echo "#!/bin/sh
+      exit 0
+      " >> autogen.sh
+      chmod +x autogen.sh
+      ln -s ../configure configure
+      cd ..
+      # end of a workaround for LP: #1882255
+      # Build
+      snapcraftctl build
+
+      rsync --remove-source-files -arhvP $SNAPCRAFT_PART_INSTALL/snap/$SNAPCRAFT_PROJECT_NAME/current/usr/* $SNAPCRAFT_PART_INSTALL/usr/
+      rm -rf $SNAPCRAFT_PART_INSTALL/snap/$SNAPCRAFT_PROJECT_NAME/current/usr
+
+      # Copy the generated apparmor template into the install dir
+      # it will be used by libvirt at runtime.
+      mkdir -p $SNAPCRAFT_PART_INSTALL/etc/apparmor.d/libvirt/
+      mkdir -p $SNAPCRAFT_PART_INSTALL/etc/apparmor.d/abstractions
+      cp $SNAPCRAFT_PART_BUILD/src/security/apparmor/TEMPLATE.qemu $SNAPCRAFT_PART_INSTALL/etc/apparmor.d/libvirt/TEMPLATE.qemu
+      cp $SNAPCRAFT_PART_BUILD/src/security/apparmor/libvirt-qemu $SNAPCRAFT_PART_INSTALL/etc/apparmor.d/abstractions/libvirt-qemu
+      # While LXC is not used, the AppArmor code errors out if the template for LXC is not there.
+      cp $SNAPCRAFT_PART_BUILD/src/security/apparmor/TEMPLATE.lxc $SNAPCRAFT_PART_INSTALL/etc/apparmor.d/libvirt/TEMPLATE.lxc
+      cp $SNAPCRAFT_PART_BUILD/src/security/apparmor/libvirt-lxc $SNAPCRAFT_PART_INSTALL/etc/apparmor.d/abstractions/libvirt-lxc
+  # MySQL
+  mysql-server:
+    plugin: dump
+    source: ./snap-wrappers/mysql
+    stage-packages:
+      - mysql-server
+      - mysql-client
+    organize:
+      mysql-start-server: bin/mysql-start-server
+      mysql-start-client: bin/mysql-start-client
+
+  # RabbitMQ
+  rabbitmq-server:
+    source: ./snap-wrappers/rabbitmq
+    plugin: dump
+    stage-packages:
+      - rabbitmq-server
+    override-build: |
+      rm -f $SNAPCRAFT_PART_INSTALL/usr/bin/erl
+      rm -f $SNAPCRAFT_PART_INSTALL/usr/lib/rabbitmq/bin/rabbitmq-script-wrapper
+      # NOTE(jamespage): The versioned path below is brittle.
+      rm -f $SNAPCRAFT_PART_INSTALL/usr/lib/rabbitmq/lib/rabbitmq_server-3.8.2/sbin/rabbitmq-defaults
+      snapcraftctl build
+    organize:
+      rabbitmq-script-wrapper: usr/lib/rabbitmq/bin/rabbitmq-script-wrapper
+      rabbitmq-defaults: usr/lib/rabbitmq/lib/rabbitmq_server-3.8.2/sbin/rabbitmq-defaults
+      erl: usr/bin/erl
+
+  # Memcached Token Caching
+  memcached:
+    plugin: nil
+    stage-packages:
+      - memcached
+
+  # Cinder LVM backend
+  lvm2:
+    after:
+      - libvirt
+    source: https://git.launchpad.net/ubuntu/+source/lvm2
+    source-type: git
+    source-branch: ubuntu/focal
+    build-packages:
+      - python3-pyudev
+    stage-packages:
+      - thin-provisioning-tools
+    plugin: autotools
+    autotools-configure-parameters:
+      - --with-confdir=/var/snap/$SNAPCRAFT_PROJECT_NAME/common/etc/
+      - --with-default-system-dir=/var/snap/$SNAPCRAFT_PROJECT_NAME/common/etc/
+      - --with-cache=internal
+      - --with-device-uid=0
+      # Assumes that the "disk" group is present on the host and has 6 for its gid.
+      # This is common but not fully reliable not knowing the target distribution.
+      - --with-device-gid=6
+      - --with-device-mode=0660
+      - --with-default-pid-dir=/run
+      - --with-default-run-dir=/run/lvm
+      - --with-default-locking-dir=/run/lock/lvm
+      - --with-thin=internal
+      - --with-thin-check=/snap/$SNAPCRAFT_PROJECT_NAME/current/usr/sbin/thin_check
+      - --with-thin-dump=/snap/$SNAPCRAFT_PROJECT_NAME/current/usr/sbin/thin_dump
+      - --with-thin-repair=/snap/$SNAPCRAFT_PROJECT_NAME/current/usr/sbin/thin_repair
+      - --enable-applib
+      - --enable-blkid_wiping
+      - --enable-cmdlib
+      - --enable-dmeventd
+      - --enable-dbus-service
+      # - --enable-lvmlockd-dlm
+      # - --enable-lvmlockd-sanlock
+      # - --enable-lvmpolld
+      # - --enable-notify-dbus
+      - --enable-pkgconfig
+      - --enable-readline
+      # The two below are especially important to make sure lvm tools do not try to use
+      # mknod themselves to create block special files for device mapper devices and
+      # so that cookies are used to synchronize udev and LVM tools operations.
+      - --enable-udev_rules
+      - --enable-udev_sync
+
+  open-iscsi:
+    after:
+      - patches
+    source: https://git.launchpad.net/ubuntu/+source/open-iscsi
+    source-type: git
+    source-branch: ubuntu/focal
+    build-packages:
+      - autotools-dev
+      - bison
+      - bzip2
+      - debhelper
+      - dh-autoreconf
+      - dh-exec
+      - dh-systemd
+      - dpkg-dev
+      - flex
+      - libisns-dev
+      - libmount-dev
+      - po-debconf
+    stage-packages:
+      - libisns0
+    plugin: dump
+    organize:
+      usr/iscsid: sbin/iscsid
+      usr/iscsiadm: sbin/iscsiadm
+      usr/iscsistart: sbin/iscsistart
+      utils/iscsi_discovery: sbin/iscsi_discovery
+      utils/iscsi-iname: sbin/iscsi-iname
+    filesets:
+      iscsi-binaries:
+        - sbin/*
+      iscsi-deps:
+        - lib/*
+        - usr/lib/*
+    stage: [$iscsi-binaries, $iscsi-deps]
+    prime: [$iscsi-binaries, $iscsi-deps]
+    override-build: |
+      # Distro patches.
+      dpkg-source --before-build .
+      # snap-specific patches.
+      for patch in ${SNAPCRAFT_STAGE}/patches/open-iscsi/*.patch; do
+        echo "Applying $(basename "$patch") ..."
+        patch \
+          --batch \
+          --forward \
+          --strip 1 \
+          --input "$patch"
+        echo
+      done
+
+      dh build-arch --with autotools_dev,autoreconf,systemd
+      snapcraftctl build
+
+  # Templates and other files to be overlaid over the snap.
+  overlay:
+    plugin: dump
+    source: snap-overlay
+
+  # Optionally interactive init script
+  init:
+    plugin: python
+    # python-version: python3
+    requirements:
+     - requirements.txt  # Relative to source path, so tools/init/req...txt
+    source: tools/init
+    stage-packages:
+      # note(dmitriis) in order to avoid conflicts about lib64/ld-linux-x86-64.so.2
+      # with other parts.
+      - libc6
+      - rsync
+    build-environment: *python-build-environment
+    after: [openstack-projects]
+    override-build: |
+      snapcraftctl build
+      `find $SNAPCRAFT_PART_INSTALL -name '__pycache__' | xargs rm -r`
+      `find $SNAPCRAFT_PART_INSTALL -name 'RECORD' | xargs rm`
+      rm $SNAPCRAFT_PART_INSTALL/pyvenv.cfg
+      rm $SNAPCRAFT_PART_INSTALL/bin/activate
+      rm $SNAPCRAFT_PART_INSTALL/bin/activate.csh
+      rm $SNAPCRAFT_PART_INSTALL/bin/activate.fish
+      # see LP: #1882994
+      rm $SNAPCRAFT_PART_INSTALL/bin/python3
+      rm $SNAPCRAFT_PART_INSTALL/bin/python
+      rm $SNAPCRAFT_PART_INSTALL/lib/python3.8/site-packages/netifaces.cpython-38-x86_64-linux-gnu.so
+
+  # Launch script
+  launch:
+    plugin: python
+    # python-version: python3
+    requirements:
+     - requirements.txt
+    source: tools/launch
+    stage-packages:
+      # note(dmitriis) in order to avoid conflicts about lib64/ld-linux-x86-64.so.2
+      # with other parts.
+      - libc6
+    build-environment: *python-build-environment
+    after: [init]
+    override-build: |
+      snapcraftctl build
+      `find $SNAPCRAFT_PART_INSTALL -name '__pycache__' | xargs rm -r`
+      `find $SNAPCRAFT_PART_INSTALL -name 'RECORD' | xargs rm`
+      rm $SNAPCRAFT_PART_INSTALL/pyvenv.cfg
+      rm $SNAPCRAFT_PART_INSTALL/bin/activate
+      rm $SNAPCRAFT_PART_INSTALL/bin/activate.csh
+      rm $SNAPCRAFT_PART_INSTALL/bin/activate.fish
+      rm $SNAPCRAFT_PART_INSTALL/bin/python3
+      rm $SNAPCRAFT_PART_INSTALL/bin/python
+
+  microstack:
+    plugin: python
+    source: tools/microstack
+    stage-packages:
+      # note(dmitriis) in order to avoid conflicts about lib64/ld-linux-x86-64.so.2
+      # with other parts.
+      - libc6
+    build-environment: *python-build-environment
+    override-build: |
+      snapcraftctl build
+      `find $SNAPCRAFT_PART_INSTALL -name '__pycache__' | xargs rm -r`
+      `find $SNAPCRAFT_PART_INSTALL -name 'RECORD' | xargs rm`
+      rm $SNAPCRAFT_PART_INSTALL/pyvenv.cfg
+      rm $SNAPCRAFT_PART_INSTALL/bin/activate
+      rm $SNAPCRAFT_PART_INSTALL/bin/activate.csh
+      rm $SNAPCRAFT_PART_INSTALL/bin/activate.fish
+      rm $SNAPCRAFT_PART_INSTALL/bin/python3
+      rm $SNAPCRAFT_PART_INSTALL/bin/python
+
+  # Clustering client and server
+  cluster:
+    plugin: python
+    # python-version: python3
+    requirements:
+      - requirements.txt
+    constraints:
+      - ${SNAPCRAFT_STAGE}/patches/upper-constraints.txt
+    source: tools/cluster
+    # note(dmitriis) in order to avoid conflicts about lib64/ld-linux-x86-64.so.2
+    # with other parts.
+    stage-packages:
+      - libc6
+    build-packages:
+      - python3-dev
+    build-environment: *python-build-environment
+    after: [launch]
+    override-build: |
+      snapcraftctl build
+      `find $SNAPCRAFT_PART_INSTALL -name '__pycache__' | xargs rm -r`
+      `find $SNAPCRAFT_PART_INSTALL -name 'RECORD' | xargs rm`
+      rm $SNAPCRAFT_PART_INSTALL/pyvenv.cfg
+      rm $SNAPCRAFT_PART_INSTALL/bin/activate
+      rm $SNAPCRAFT_PART_INSTALL/bin/activate.csh
+      rm $SNAPCRAFT_PART_INSTALL/bin/activate.fish
+      rm $SNAPCRAFT_PART_INSTALL/bin/python
+      rm $SNAPCRAFT_PART_INSTALL/bin/python3
+
+  setup-lvm-loopdev:
+    source-type: local
+    source: ./tools/setup-lvm-loopdev
+    plugin: dump
+    organize:
+      setup-lvm-loopdev: bin/setup-lvm-loopdev
+    stage-packages:
+      # note(dmitriis) in order to avoid conflicts about lib64/ld-linux-x86-64.so.2
+      # with other parts.
+      - libc6
+      # fallocate
+      - util-linux
+      # losetup
+      - mount
+
+  ### LMA stack ###
+  filebeat:
+    plugin: dump
+    source: ./snap-wrappers/filebeat
+    after: [ lma-build-prep, qemu, libvirt ]
+    stage-packages: [ filebeat ]
+    organize:
+      filebeat: bin/filebeat
+
+  nrpe:
+    plugin: dump
+    source: ./snap-wrappers/nrpe
+    organize:
+      nrpe: bin/nrpe
+    after: [ lma-build-prep ]
+    stage-packages: [ nagios-nrpe-server, nagios-nrpe-plugin, monitoring-plugins, monitoring-plugins-basic, monitoring-plugins-common ]
+
+  telegraf:
+    plugin: dump
+    source: ./snap-wrappers/telegraf
+    organize:
+      telegraf: bin/telegraf
+    # we use autotools plugin here because it brings git, make
+    # otherwise we'd have to add respective packages
+    after: [ lma-build-prep, qemu, libvirt ]
+    # See https://forum.snapcraft.io/t/patchelf-broke-my-binary/4928
+    # and https://bugs.launchpad.net/snapcraft/+bug/1753995
+    build-attributes: [no-patchelf]
+    stage-packages: [ telegraf, iproute2, bridge-utils, ethtool, fancontrol, libatm1, ipmitool, freeipmi-tools ]
+
+  lma-build-prep:
+    plugin: nil
+    source: ""
+    build-packages:
+        - dirmngr
+    override-build: |
+      cat $SNAPCRAFT_PROJECT_DIR/filebeat.pgp.key | apt-key add -
+      cat $SNAPCRAFT_PROJECT_DIR/telegraf.pgp.key | apt-key add -
+      apt-get install apt-transport-https
+      echo 'deb https://artifacts.elastic.co/packages/5.x/apt stable main' > /etc/apt/sources.list.d/elastic-5.x.list
+      echo 'deb http://ppa.launchpad.net/telegraf-devs/ppa/ubuntu bionic main' > /etc/apt/sources.list.d/telegraf.x.list
+      # this needs to be re-worked in order to be built in-place
+      echo 'deb http://ppa.launchpad.net/nikolay.vinogradov/nrpe-root/ubuntu bionic main' > /etc/apt/sources.list.d/nrpe-root.list
+      sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys F767C80E0FC5C835
+      apt-get update --allow-unauthenticated
+
+  #lma-configs:
+  #  plugin: dump
+  #  source: ./lma
+  #  after: [ lma-build-prep ]
+  #  organize:
+  #    'config/nrpe': etc/nrpe
+  #    'config/telegraf': etc/telegraf
+
+
+  checks:
+    plugin: dump
+    source: ./checks
+    organize:
+      check_systemd.py: usr/lib/nagios/plugins/check_systemd.py
+
+
+hooks:
+  install:
+    plugs: [ network ] # TODO: , microstack-support]
+  configure:
+    plugs: [ network ] # TODO:, microstack-support]
+  post-refresh:
+    plugs: [ network ] #, microstack-support]
+  remove:
+    # NOTE: network-bind is here due to LP: #1644573.
+    plugs:
+      - network
+      - network-bind
+      - network-control
+      - firewall-control
+      - hardware-observe
+      # TODO: - microstack-support
+      - block-devices

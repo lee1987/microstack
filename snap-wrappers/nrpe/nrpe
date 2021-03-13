@@ -1,0 +1,6 @@
+#!/bin/bash
+
+# this directory doesn't need to exist for nrpe to start
+mkdir -p $SNAP_COMMON/nrpe/nrpe.conf.d
+
+$SNAP/usr/sbin/nrpe -c $(snapctl get config.alerting.custom-config) -d -f

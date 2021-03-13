@@ -1,0 +1,5 @@
+# netaddr is pinned to match the upper-constraints.txt file of Ussuri
+netaddr===0.7.19
+netifaces
+pymysql==0.9.3
+wget

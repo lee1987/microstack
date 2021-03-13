@@ -1,0 +1,8 @@
+cryptography
+flake8
+mock
+oslo.serialization===3.1.1
+pylint
+python-dateutil===2.8.1
+pep8
+stestr

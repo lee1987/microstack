@@ -1,0 +1,11 @@
+#!/bin/bash
+
+mkdir -p $SNAP_COMMON/var/filebeat
+mkdir -p $SNAP_COMMON/var/log/filebeat
+mkdir -p $SNAP_COMMON/etc/filebeat/filebeat.conf.d
+
+$SNAP/usr/share/filebeat/bin/filebeat  -c "$(snapctl get config.logging.custom-config)" \
+    -path.home $SNAP/usr/share/filebeat/ \
+    -path.config $SNAP_COMMON/etc/filebeat/filebeat.conf.d \
+    -path.data $SNAP_COMMON/var/filebeat \
+    -path.logs $SNAP_COMMON/var/log/filebeat

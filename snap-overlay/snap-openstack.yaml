@@ -1,0 +1,381 @@
+setup:
+  dirs:
+    - "{snap_common}/etc/keystone/keystone.conf.d"
+    - "{snap_common}/etc/cinder/cinder.conf.d"
+    - "{snap_common}/etc/nova/nova.conf.d"
+    - "{snap_common}/etc/neutron/neutron.conf.d"
+    - "{snap_common}/etc/neutron/plugins/ml2"
+    - "{snap_common}/etc/neutron/policy.d"
+    - "{snap_common}/etc/neutron/rootwrap.d"
+    - "{snap_common}/etc/nginx/sites-enabled"
+    - "{snap_common}/etc/nginx/snap/sites-enabled"
+    - "{snap_common}/etc/glance/glance.conf.d"
+    - "{snap_common}/etc/placement/placement.conf.d"
+    - "{snap_common}/etc/horizon/horizon.conf.d"
+    - "{snap_common}/etc/horizon/local_settings.d"
+    - "{snap_common}/var/horizon/static"
+    - "{snap_common}/etc/keystone/uwsgi/snap"
+    - "{snap_common}/etc/cinder/uwsgi/snap"
+    - "{snap_common}/etc/nova/uwsgi/snap"
+    - "{snap_common}/etc/horizon/uwsgi/snap"
+    - "{snap_common}/etc/placement/uwsgi/snap"
+    - "{snap_common}/etc/cluster/tls"
+    - "{snap_common}/etc/cluster/uwsgi/snap"
+    - "{snap_common}/etc/rabbitmq"
+    - "{snap_common}/fernet-keys"
+    - "{snap_common}/lib"
+    - "{snap_common}/lib/images"
+    - "{snap_common}/lock"
+    - "{snap_common}/log"
+    - "{snap_common}/run"
+    - "{snap_common}/lib/instances"
+    - "{snap_common}/etc/apparmor.d/libvirt"
+    - "{snap_common}/etc/iscsi"
+    - "{snap_common}/etc/target"
+  templates:
+    cluster-nginx.conf.j2: "{snap_common}/etc/nginx/snap/sites-enabled/cluster.conf"
+    keystone-nginx.conf.j2: "{snap_common}/etc/nginx/snap/sites-enabled/keystone.conf"
+    keystone-snap.conf.j2: "{snap_common}/etc/keystone/keystone.conf.d/keystone-snap.conf"
+    neutron-snap.conf.j2: "{snap_common}/etc/neutron/neutron.conf.d/neutron-snap.conf"
+    nginx.conf.j2: "{snap_common}/etc/nginx/snap/nginx.conf"
+    nova-snap.conf.j2: "{snap_common}/etc/nova/nova.conf.d/nova-snap.conf"
+    nova-nginx.conf.j2: "{snap_common}/etc/nginx/snap/sites-enabled/nova.conf"
+    glance-snap.conf.j2: "{snap_common}/etc/glance/glance.conf.d/glance-snap.conf"
+    placement-nginx.conf.j2: "{snap_common}/etc/nginx/snap/sites-enabled/placement.conf"
+    placement-snap.conf.j2: "{snap_common}/etc/placement/placement.conf.d/placement-snap.conf"
+    cinder-nginx.conf.j2: "{snap_common}/etc/nginx/snap/sites-enabled/cinder.conf"
+    cinder-snap.conf.j2: "{snap_common}/etc/cinder/cinder.conf.d/cinder-snap.conf"
+    cinder.database.conf.j2: "{snap_common}/etc/cinder/cinder.conf.d/database.conf"
+    cinder.rabbitmq.conf.j2: "{snap_common}/etc/cinder/cinder.conf.d/rabbitmq.conf"
+    cinder.keystone.conf.j2: "{snap_common}/etc/cinder/cinder.conf.d/keystone.conf"
+    cinder-rootwrap.conf.j2: "{snap_common}/etc/cinder/rootwrap.conf"
+    horizon-snap.conf.j2: "{snap_common}/etc/horizon/horizon.conf.d/horizon-snap.conf"
+    horizon-nginx.conf.j2: "{snap_common}/etc/nginx/snap/sites-enabled/horizon.conf"
+    05_snap_tweaks.j2: "{snap_common}/etc/horizon/local_settings.d/_05_snap_tweaks.py"
+    libvirtd.conf.j2: "{snap_common}/etc/libvirt/libvirtd.conf"
+    qemu.conf.j2: "{snap_common}/etc/libvirt/qemu.conf"
+    virtlogd.conf.j2: "{snap_common}/etc/libvirt/virtlogd.conf"
+    microstack.rc.j2: "{snap_common}/etc/microstack.rc"
+    microstack.json.j2: "{snap_common}/etc/microstack.json"
+    glance.conf.d.keystone.conf.j2: "{snap_common}/etc/glance/glance.conf.d/keystone.conf"
+    placement.conf.d.keystone.conf.j2: "{snap_common}/etc/placement/placement.conf.d/keystone.conf"
+    nova.conf.d.keystone.conf.j2: "{snap_common}/etc/nova/nova.conf.d/keystone.conf"
+    nova.conf.d.database.conf.j2: "{snap_common}/etc/nova/nova.conf.d/database.conf"
+    nova.conf.d.rabbitmq.conf.j2: "{snap_common}/etc/nova/nova.conf.d/rabbitmq.conf"
+    nova.conf.d.glance.conf.j2: "{snap_common}/etc/nova/nova.conf.d/glance.conf"
+    nova.conf.d.neutron.conf.j2: "{snap_common}/etc/nova/nova.conf.d/neutron.conf"
+    nova.conf.d.placement.conf.j2: "{snap_common}/etc/nova/nova.conf.d/placement.conf"
+    nova.conf.d.console.conf.j2: "{snap_common}/etc/nova/nova.conf.d/console.conf"
+    keystone.database.conf.j2: "{snap_common}/etc/keystone/keystone.conf.d/database.conf"
+    glance.database.conf.j2: "{snap_common}/etc/glance/glance.conf.d/database.conf"
+    placement.conf.d.database.conf.j2: "{snap_common}/etc/placement/placement.conf.d/database.conf"
+    neutron.keystone.conf.j2: "{snap_common}/etc/neutron/neutron.conf.d/keystone.conf"
+    neutron.nova.conf.j2: "{snap_common}/etc/neutron/neutron.conf.d/nova.conf"
+    neutron.placement.conf.j2: "{snap_common}/etc/neutron/neutron.conf.d/placement.conf"
+    neutron.database.conf.j2: "{snap_common}/etc/neutron/neutron.conf.d/database.conf"
+    neutron.conf.d.rabbitmq.conf.j2: "{snap_common}/etc/neutron/neutron.conf.d/rabbitmq.conf"
+    neutron_ovn_metadata_agent.ini.j2: "{snap_common}/etc/neutron/neutron_ovn_metadata_agent.ini"
+    rabbitmq.conf.j2: "{snap_common}/etc/rabbitmq/rabbitmq.config"
+    iscsid.conf.j2: "{snap_common}/etc/iscsi/iscsid.conf"
+
+    # LMA stack templates
+    telegraf.conf.j2: "{snap_common}/etc/telegraf/telegraf-microstack.conf"
+    nrpe.cfg.j2: "{snap_common}/etc/nrpe/nrpe-microstack.cfg"
+    filebeat.yaml.j2: "{snap_common}/etc/filebeat/filebeat-microstack.yaml"
+  chmod:
+    "{snap_common}/instances": 0755
+    "{snap_common}/etc/microstack.rc": 0644
+    "{snap_common}/etc/microstack.json": 0644
+  snap-config-keys:
+    is_clustered: 'config.is-clustered'
+    cluster_tls_cert_path: 'config.cluster.tls-cert-path'
+    cluster_tls_key_path: 'config.cluster.tls-key-path'
+    region_name: 'config.keystone.region-name'
+    keystone_password: 'config.credentials.keystone-password'
+    nova_password: 'config.credentials.nova-password'
+    cinder_password: 'config.credentials.cinder-password'
+    neutron_password: 'config.credentials.neutron-password'
+    glance_password: 'config.credentials.glance-password'
+    placement_password: 'config.credentials.placement-password'
+    rabbitmq_password: 'config.credentials.rabbitmq-password'
+    control_ip: 'config.network.control-ip'
+    node_fqdn: 'config.network.node-fqdn'
+    compute_ip: 'config.network.compute-ip'
+    extgateway: 'config.network.ext-gateway'
+    extcidr: 'config.network.ext-cidr'
+    dns_servers: 'config.network.dns-servers'
+    dns_domain: 'config.network.dns-domain'
+    dashboard_allowed_hosts: 'config.network.dashboard-allowed-hosts'
+    dashboard_port: 'config.network.ports.dashboard'
+    mysql_port: 'config.network.ports.mysql'
+    rabbit_port: 'config.network.ports.rabbit'
+    logging_tag: 'config.logging.logging.tag'
+    logging_host: 'config.logging.host'
+    monitoring_tag: 'config.monitoring.tag'
+    monitoring_ipmi: 'config.monitoring.ipmi'
+    alerting_tag: 'config.alerting.tag'
+    ovn_nb_connection: 'config.network.ovn-nb-connection'
+    ovn_sb_connection: 'config.network.ovn-sb-connection'
+    ovn_metadata_proxy_shared_secret: 'config.credentials.ovn-metadata-proxy-shared-secret'
+    setup_loop_based_cinder_lvm_backend: 'config.cinder.setup-loop-based-cinder-lvm-backend'
+    lvm_backend_volume_group: 'config.cinder.lvm-backend-volume-group'
+    virt_type: 'config.nova.virt-type'
+    cpu_mode: 'config.nova.cpu-mode'
+    cpu_models: 'config.nova.cpu-models'
+entry_points:
+  keystone-manage:
+    binary: "{snap}/bin/keystone-manage"
+    config-files:
+      - "{snap}/etc/keystone/keystone.conf"
+    config-files-override:
+      - "{snap_common}/etc/keystone/keystone.conf"
+    config-dirs:
+      - "{snap_common}/etc/keystone/keystone.conf.d"
+  keystone-uwsgi:
+    type: uwsgi
+    uwsgi-dir: "{snap_common}/etc/keystone/uwsgi/snap"
+    uwsgi-dir-override: "{snap_common}/etc/keystone/uwsgi"
+    config-files:
+      - "{snap}/etc/keystone/keystone.conf"
+    config-files-override:
+      - "{snap_common}/etc/keystone/keystone.conf"
+    config-dirs:
+      - "{snap_common}/etc/keystone/keystone.conf.d"
+    templates:
+      keystone-api.ini.j2: "{snap_common}/etc/keystone/uwsgi/snap/keystone-api.ini"
+  cluster-uwsgi:
+    type: uwsgi
+    uwsgi-dir: "{snap_common}/etc/cluster/uwsgi/snap"
+    uwsgi-dir-override: "{snap_common}/etc/cluster/uwsgi"
+    templates:
+      cluster-api.ini.j2: "{snap_common}/etc/cluster/uwsgi/snap/cluster-api.ini"
+  nginx:
+    type: nginx
+    config-file: "{snap_common}/etc/nginx/snap/nginx.conf"
+    config-file-override: "{snap_common}/etc/nginx/nginx.conf"
+  nova-api-os-compute:
+    binary: "{snap}/bin/nova-api-os-compute"
+    config-files:
+      - "{snap}/etc/nova/nova.conf"
+    config-files-override:
+      - "{snap_common}/etc/nova/nova.conf"
+    config-dirs:
+      - "{snap_common}/etc/nova/nova.conf.d"
+  nova-conductor:
+    binary: "{snap}/bin/nova-conductor"
+    config-files:
+      - "{snap}/etc/nova/nova.conf"
+    config-files-override:
+      - "{snap_common}/etc/nova/nova.conf"
+    config-dirs:
+      - "{snap_common}/etc/nova/nova.conf.d"
+  nova-scheduler:
+    binary: "{snap}/bin/nova-scheduler"
+    config-files:
+      - "{snap}/etc/nova/nova.conf"
+    config-files-override:
+      - "{snap_common}/etc/nova/nova.conf"
+    config-dirs:
+      - "{snap_common}/etc/nova/nova.conf.d"
+  nova-compute:
+    binary: "{snap}/bin/nova-compute"
+    config-files:
+      - "{snap}/etc/nova/nova.conf"
+    config-files-override:
+      - "{snap_common}/etc/nova/nova.conf"
+    config-dirs:
+      - "{snap_common}/etc/nova/nova.conf.d"
+  nova-api-metadata:
+    binary: "{snap}/bin/nova-api-metadata"
+    config-files:
+      - "{snap}/etc/nova/nova.conf"
+    config-files-override:
+      - "{snap_common}/etc/nova/nova.conf"
+    config-dirs:
+      - "{snap_common}/etc/nova/nova.conf.d"
+  nova-manage:
+    binary: "{snap}/bin/nova-manage"
+    config-files:
+      - "{snap}/etc/nova/nova.conf"
+    config-files-override:
+      - "{snap_common}/etc/nova/nova.conf"
+    config-dirs:
+      - "{snap_common}/etc/nova/nova.conf.d"
+  nova-spicehtml5proxy:
+    binary: "{snap}/bin/nova-spicehtml5proxy"
+    config-files:
+      - "{snap}/etc/nova/nova.conf"
+    config-files-override:
+      - "{snap_common}/etc/nova/nova.conf"
+    config-dirs:
+      - "{snap_common}/etc/nova/nova.conf.d"
+    templates:
+      nova.conf.d.console.conf.j2:
+        "{snap_common}/etc/nova/nova.conf.d/console.conf"
+  neutron-db-manage:
+    binary: "{snap}/bin/neutron-db-manage"
+    config-files:
+      - "{snap}/etc/neutron/neutron.conf"
+      - "{snap}/etc/neutron/plugins/ml2/ml2_conf.ini"
+    config-files-override:
+      - "{snap_common}/etc/neutron/neutron.conf"
+      - "{snap_common}/etc/neutron/plugins/ml2/ml2_conf.ini"
+    config-dirs:
+      - "{snap_common}/etc/neutron/neutron.conf.d"
+  neutron-server:
+    binary: "{snap}/bin/neutron-server"
+    config-files:
+      - "{snap}/etc/neutron/neutron.conf"
+      - "{snap}/etc/neutron/plugins/ml2/ml2_conf.ini"
+    config-files-override:
+      - "{snap_common}/etc/neutron/neutron.conf"
+      - "{snap_common}/etc/neutron/plugins/ml2/ml2_conf.ini"
+    config-dirs:
+      - "{snap_common}/etc/neutron/neutron.conf.d"
+  neutron-ovs-cleanup:
+    binary: "{snap}/bin/neutron-ovs-cleanup"
+    config-files:
+      - "{snap}/etc/neutron/neutron.conf"
+    config-files-override:
+      - "{snap_common}/etc/neutron/neutron.conf"
+    config-dirs:
+      - "{snap_common}/etc/neutron/neutron.conf.d"
+  neutron-netns-cleanup:
+    binary: "{snap}/bin/neutron-netns-cleanup"
+    config-files:
+      - "{snap}/etc/neutron/neutron.conf"
+    config-files-override:
+      - "{snap_common}/etc/neutron/neutron.conf"
+    config-dirs:
+      - "{snap_common}/etc/neutron/neutron.conf.d"
+  neutron-ovn-metadata-agent:
+    binary: "{snap}/bin/neutron-ovn-metadata-agent"
+    config-files:
+      - "{snap}/etc/neutron/neutron.conf"
+      - "{snap}/etc/neutron/neutron_ovn_metadata_agent.ini"
+    config-files-override:
+      - "{snap_common}/etc/neutron/neutron.conf"
+      - "{snap_common}/etc/neutron/neutron_ovn_metadata_agent.ini"
+    config-dirs:
+      - "{snap_common}/etc/neutron/neutron.conf.d"
+    templates:
+      neutron_ovn_metadata_agent.ini.j2:
+        "{snap_common}/etc/neutron/neutron_ovn_metadata_agent.ini"
+  glance-manage:
+    binary: "{snap}/bin/glance-manage"
+    config-files:
+      - "{snap}/etc/glance/glance-manage.conf"
+    config-files-override:
+      - "{snap_common}/etc/glance/glance-manage.conf"
+    config-dirs:
+      - "{snap_common}/etc/glance/glance.conf.d"
+  glance-registry:
+    binary: "{snap}/bin/glance-registry"
+    config-files:
+      - "{snap}/etc/glance/glance-registry.conf"
+    config-files-override:
+      - "{snap_common}/etc/glance/glance-registry.conf"
+    config-dirs:
+      - "{snap_common}/etc/glance/glance.conf.d"
+  glance-api:
+    binary: "{snap}/bin/glance-api"
+    config-files:
+      - "{snap}/etc/glance/glance-api.conf"
+    config-files-override:
+      - "{snap_common}/etc/glance/glance-api.conf"
+    config-dirs:
+      - "{snap_common}/etc/glance/glance.conf.d"
+  placement-uwsgi:
+    type: uwsgi
+    uwsgi-dir: "{snap_common}/etc/placement/uwsgi/snap"
+    uwsgi-dir-override: "{snap_common}/etc/placement/uwsgi"
+    config-files:
+      - "{snap}/etc/placement/placement.conf"
+    config-files-override:
+      - "{snap_common}/etc/placement/placement.conf"
+    config-dirs:
+      - "{snap_common}/etc/placement/placement.conf.d"
+    templates:
+      placement-api.ini.j2:
+        "{snap_common}/etc/placement/uwsgi/snap/placement-api.ini"
+  placement-manage:
+    binary: "{snap}/bin/placement-manage"
+    config-files:
+      - "{snap}/etc/placement/placement.conf"
+    config-files-override:
+      - "{snap_common}/etc/placement/placement.conf"
+    config-dirs:
+      - "{snap_common}/etc/placement/placement.conf.d"
+  cinder-backup:
+    binary: "{snap}/bin/cinder-backup"
+    config-files:
+      - "{snap}/etc/cinder/cinder.conf"
+    config-files-override:
+      - "{snap_common}/etc/cinder/cinder.conf"
+    config-dirs:
+      - "{snap_common}/etc/cinder/cinder.conf.d"
+  cinder-manage:
+    binary: "{snap}/bin/cinder-manage"
+    config-files:
+      - "{snap}/etc/cinder/cinder.conf"
+    config-files-override:
+      - "{snap_common}/etc/cinder/cinder.conf"
+    config-dirs:
+      - "{snap_common}/etc/cinder/cinder.conf.d"
+  cinder-scheduler:
+    binary: "{snap}/bin/cinder-scheduler"
+    config-files:
+      - "{snap}/etc/cinder/cinder.conf"
+    config-files-override:
+      - "{snap_common}/etc/cinder/cinder.conf"
+    config-dirs:
+      - "{snap_common}/etc/cinder/cinder.conf.d"
+  cinder-volume:
+    binary: "{snap}/bin/cinder-volume"
+    config-files:
+      - "{snap}/etc/cinder/cinder.conf"
+    config-files-override:
+      - "{snap_common}/etc/cinder/cinder.conf"
+    config-dirs:
+      - "{snap_common}/etc/cinder/cinder.conf.d"
+  cinder-uwsgi:
+    type: uwsgi
+    uwsgi-dir: "{snap_common}/etc/cinder/uwsgi/snap"
+    uwsgi-dir-override: "{snap_common}/etc/cinder/uwsgi"
+    config-files:
+      - "{snap}/etc/cinder/cinder.conf"
+    config-files-override:
+      - "{snap_common}/etc/cinder/cinder.conf"
+    config-dirs:
+      - "{snap_common}/etc/cinder/cinder.conf.d"
+    templates:
+      cinder-api.ini.j2: "{snap_common}/etc/cinder/uwsgi/snap/cinder-api.ini"
+  horizon-uwsgi:
+    type: uwsgi
+    uwsgi-dir: "{snap_common}/etc/horizon/uwsgi/snap"
+    uwsgi-dir-override: "{snap_common}/etc/horizon/uwsgi"
+    config-dirs:
+      - "{snap_common}/etc/horizon/horizon.conf.d"
+    templates:
+      horizon.ini.j2: "{snap_common}/etc/horizon/uwsgi/snap/horizon.ini"
+  filebeat:
+    binary: "{snap}/bin/filebeat.sh"
+    type: simple
+    config-dirs:
+      - "{snap_common}/lma/filebeat"
+    templates:
+      filebeat.yml.j2: "{snap_common}/etc/filebeat/filebeat.yml"
+  nrpe:
+    binary: "{snap}/bin/nrpe.sh"
+    type: simple
+    config-dirs:
+      - "{snap_common}/lma/nrpe"
+    templates:
+      nrpe.conf.j2: "{snap_common}/etc/nrpe/nrpe.conf"
+  telegraf:
+    binary: "{snap}/bin/telegraf"
+    type: simple
+    config-dirs:
+      - "{snap_common}/lma/telegraf"
+    templates:
+      telegraf.conf.j2: "{snap_common}/etc/telegraf/telegraf.conf"

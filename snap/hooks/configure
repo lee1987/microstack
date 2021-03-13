@@ -1,0 +1,6 @@
+#!/bin/bash
+set -ex
+
+snap-openstack setup # Write out templates
+
+source $SNAP_COMMON/etc/microstack.rc

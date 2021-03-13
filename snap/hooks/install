@@ -1,0 +1,121 @@
+#!/bin/bash
+set -ex
+
+
+# Initialize config
+set-default-config.py
+
+# TODO(dmitriis): disable other services and only enable them once the
+# prerequisites are met instead of allowing snapd to start them and make them fail.
+# snapd starts all non-disabled services by default which may lead to errors such as
+# a module loading error in case of ovs-vswitchd. The sequence is as follows:
+# 1. The snap is installed;
+# 2. Non-disabled services are started;
+# 3. Interfaces that do not have auto-connection enabled are manually connected by
+#    an operator (connecting openvswitch-support loads the openvswitch kernel module
+#    but auto-connection is not enabled for openvswitch-support).
+snapctl stop --disable $SNAP_INSTANCE_NAME.nginx
+snapctl stop --disable $SNAP_INSTANCE_NAME.keystone-uwsgi
+snapctl stop --disable $SNAP_INSTANCE_NAME.placement-uwsgi
+snapctl stop --disable $SNAP_INSTANCE_NAME.nova-api
+snapctl stop --disable $SNAP_INSTANCE_NAME.nova-compute
+snapctl stop --disable $SNAP_INSTANCE_NAME.nova-conductor
+snapctl stop --disable $SNAP_INSTANCE_NAME.nova-api-metadata
+snapctl stop --disable $SNAP_INSTANCE_NAME.nova-spicehtml5proxy
+snapctl stop --disable $SNAP_INSTANCE_NAME.nova-scheduler
+
+snapctl stop --disable $SNAP_INSTANCE_NAME.horizon-uwsgi
+
+snapctl stop --disable $SNAP_INSTANCE_NAME.neutron-api
+
+snapctl stop --disable $SNAP_INSTANCE_NAME.glance-api
+snapctl stop --disable $SNAP_INSTANCE_NAME.registry
+
+snapctl stop --disable $SNAP_INSTANCE_NAME.cinder-uwsgi
+snapctl stop --disable $SNAP_INSTANCE_NAME.cinder-scheduler
+
+snapctl stop --disable $SNAP_INSTANCE_NAME.ovsdb-server
+snapctl stop --disable $SNAP_INSTANCE_NAME.neutron-ovn-metadata-agent
+snapctl stop --disable $SNAP_INSTANCE_NAME.ovn-ovsdb-server-sb
+snapctl stop --disable $SNAP_INSTANCE_NAME.ovn-ovsdb-server-nb
+snapctl stop --disable $SNAP_INSTANCE_NAME.ovs-vswitchd
+snapctl stop --disable $SNAP_INSTANCE_NAME.ovn-northd
+snapctl stop --disable $SNAP_INSTANCE_NAME.ovn-controller
+
+snapctl stop --disable $SNAP_INSTANCE_NAME.rabbitmq-server
+snapctl stop --disable $SNAP_INSTANCE_NAME.mysqld
+
+snapctl stop --disable $SNAP_INSTANCE_NAME.iscsid
+snapctl stop --disable $SNAP_INSTANCE_NAME.target
+
+# No meaningful default backend is available yet.
+snapctl stop --disable $SNAP_INSTANCE_NAME.cinder-backup
+# Will only be enabled based on the answers during initialization.
+snapctl stop --disable $SNAP_INSTANCE_NAME.setup-lvm-loopdev
+# Will only be enabled if a backend is chosen to be configured by the user.
+snapctl stop --disable $SNAP_INSTANCE_NAME.cinder-volume
+
+snapctl stop --disable $SNAP_INSTANCE_NAME.filebeat
+snapctl stop --disable $SNAP_INSTANCE_NAME.nrpe
+snapctl stop --disable $SNAP_INSTANCE_NAME.telegraf
+
+snapctl stop --disable $SNAP_INSTANCE_NAME.cluster-uwsgi
+
+mkdir -p $SNAP_DATA/lib/libvirt/images
+mkdir -p ${SNAP_COMMON}/log/libvirt/qemu
+# NOTE(dmitriis): there is currently no way to make sure this directory gets
+# recreated on reboot which would normally be done via systemd-tmpfiles.
+mkdir -p /run/lock/snap.$SNAP_INSTANCE_NAME
+
+# Copy TEMPLATE.qemu into the common directory. Libvirt generates additional
+# policy dynamically which is why its apparmor directory is writeable under $SNAP_COMMON.
+# Also copy other abstractions that are used by this template.
+rsync -rh $SNAP/etc/apparmor.d $SNAP_COMMON/etc
+
+# MySQL snapshot for speedy install
+# snapshot is a mysql data dir with
+# rocky keystone,nova,glance,neutron dbs.
+mkdir -p ${SNAP_COMMON}/lib
+
+# Put cirros (and potentially other) images in a user writeable place.
+mkdir -p ${SNAP_COMMON}/images
+cp ${SNAP}/images/* ${SNAP_COMMON}/images/
+
+# Install conf.d configuration from snap for db etc
+echo "Installing configuration for OpenStack Services"
+for project in neutron nova keystone glance; do
+    mkdir -p ${SNAP_COMMON}/etc/${project}/${project}.conf.d
+    cp -r ${SNAP}/etc/${project}/${project}.conf.d/* ${SNAP_COMMON}/etc/${project}/${project}.conf.d || true # Skip conf files that have been moved into templates
+done
+# Make a place for our horizon config overrides to live
+mkdir -p ${SNAP_COMMON}/etc/horizon/local_settings.d
+
+# ----- OVN -----
+# Lay out directories used for OVN configuration and persistent data
+for dir in etc/ovn var/lib/ovn var/log/ovn var/run/ovn; do
+    if [ ! -d $SNAP_COMMON/$dir ]; then
+        mkdir -p $SNAP_COMMON/$dir
+    fi
+done
+
+# Prepare access to the hosting systems Open vSwitch instance
+# NOTE end user must execute `snap connect ovn:openvswitch` for this to work
+ln -s /var/run/openvswitch $SNAP_COMMON/var/run/openvswitch
+
+# The `ovn-ctl` script does not have enough knobs for useful tailoring of
+# execution of the `ovn-northd` daemon.  Instead it provides a file to pass
+# arguments directly to the `ovn-northd` process.
+#
+# We fill the `args_northd` with necessary defaults and link to the file
+# `ovn-ctl` looks for.
+#
+# For other daemons the corrensponding args_* file is used to pass arguments to
+# `ovn-ctl`.
+cat << EOF > $SNAP_COMMON/args_northd
+--ovnnb-db=unix:$SNAP_COMMON/run/ovn/ovnnb_db.sock
+--ovnsb-db=unix:$SNAP_COMMON/run/ovn/ovnsb_db.sock
+EOF
+ln -s $SNAP_COMMON/args_northd $SNAP_COMMON/etc/ovn/ovn-northd-db-params.conf
+# ----- END OVN -----
+
+snap-openstack setup  # Sets up templates for the first time.

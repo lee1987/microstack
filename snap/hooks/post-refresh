@@ -1,0 +1,39 @@
+#!/bin/bash
+set -ex
+
+# Refresh the TEMPLATE.qemu apparmor profile and abstractions.
+rsync -rh $SNAP/etc/apparmor.d $SNAP_COMMON/etc
+
+if [ -z "$(snapctl get config)" ]; then
+    # [2019-11-15] Handle build 171 (beta) -> 182
+
+    # We are upgrading from a version of the snap from before we put all
+    # config values under a config tree. Set the default values now (the
+    # old values were not documented, and we assume that they were not
+    # set).
+    set-default-config.py
+
+    # Make a place for our horizon config overrides to live. We piggy
+    # back on the above check, because the changes were made
+    # concurrently.
+    mkdir -p ${SNAP_COMMON}/etc/horizon/local_settings.d
+fi
+
+# Add default ports for mysql, rabbit and dashboard services.
+# [2019-11-21] build 171 (beta) -> master
+if [ -z "$(snapctl get config.network.ports.dashboard)" ]; then
+        snapctl set config.network.ports.dashboard=80
+fi
+
+if [ -z "$(snapctl get config.network.ports.mysql)" ]; then
+        snapctl set config.network.ports.mysql=3306
+fi
+
+if [ -z "$(snapctl get config.network.ports.rabbit)" ]; then
+        snapctl set config.network.ports.rabbit=5672
+fi
+
+mkdir -p ${SNAP_COMMON}/log/libvirt/qemu
+mkdir -p /run/lock/snap.$SNAP_INSTANCE_NAME
+
+snap-openstack setup  # Write any template changes.

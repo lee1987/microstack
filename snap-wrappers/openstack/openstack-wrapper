@@ -1,0 +1,12 @@
+#!/bin/bash
+
+set -e
+
+if ! [ "$(snapctl get initialized)" == "true" ]; then
+    echo "Microstack is not initialized. Please run microstack.init!"
+    exit 1;
+fi
+
+source $SNAP_COMMON/etc/microstack.rc
+
+exec $@

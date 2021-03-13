@@ -1,0 +1,10 @@
+#!/bin/bash
+
+set -e
+
+if ! [ "$(snapctl get initialized)" == "true" ]; then
+   echo "Microstack not yet initliazed. Waiting to start."
+   exit 0;
+fi
+
+exec $@

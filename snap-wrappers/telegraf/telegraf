@@ -1,0 +1,8 @@
+#!/bin/bash
+
+mkdir -p $SNAP_COMMON/etc/telegraf/telegraf.d
+
+# FIXME: set -path.config to correct folder
+$SNAP/usr/bin/telegraf --config "$(snapctl get config.monitoring.custom-config)" \
+    --config-directory $SNAP_COMMON/etc/telegraf/telegraf.d \
+    --pidfile $SNAP_COMMON/run/telegraf.pid

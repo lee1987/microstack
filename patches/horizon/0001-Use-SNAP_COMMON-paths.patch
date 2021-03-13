@@ -1,0 +1,66 @@
+From 36c45710c8cc3bbdf86fe2513a07a0d5f0a5c3f9 Mon Sep 17 00:00:00 2001
+From: Dmitrii Shcherbakov <dmitrii.shcherbakov@canonical.com>
+Date: Mon, 8 Jun 2020 13:56:20 +0000
+Subject: [PATCH] Use SNAP_COMMON paths
+
+---
+ openstack_dashboard/local/local_settings.py         | 4 +++-
+ openstack_dashboard/settings.py                     | 6 ++++--
+ 2 files changed, 7 insertions(+), 3 deletions(-)
+
+diff --git a/lib/python3.8/site-packages/openstack_dashboard/local/local_settings.py b/lib/python3.8/site-packages/openstack_dashboard/local/local_settings.py
+index 2b084bf24..aad403c04 100644
+--- a/lib/python3.8/site-packages/openstack_dashboard/local/local_settings.py
++++ b/lib/python3.8/site-packages/openstack_dashboard/local/local_settings.py
+@@ -22,6 +22,8 @@ from openstack_dashboard.settings import HORIZON_CONFIG
+ 
+ DEBUG = True
+ 
++SNAP_COMMON = os.environ['SNAP_COMMON']
++
+ # This setting controls whether or not compression is enabled. Disabling
+ # compression makes Horizon considerably slower, but makes it much easier
+ # to debug JS and CSS changes
+@@ -74,7 +76,7 @@ DEBUG = True
+ # including on the login form.
+ #HORIZON_CONFIG["disable_password_reveal"] = False
+ 
+-LOCAL_PATH = os.path.dirname(os.path.abspath(__file__))
++LOCAL_PATH = "{}/etc/horizon".format(SNAP_COMMON)
+ 
+ # Set custom secret key:
+ # You can either set it to a specific value or you can let horizon generate a
+diff --git a/lib/python3.8/site-packages/openstack_dashboard/settings.py b/lib/python3.8/site-packages/openstack_dashboard/settings.py
+index 81b8e45e1..5909bc8a8 100644
+--- a/lib/python3.8/site-packages/openstack_dashboard/settings.py
++++ b/lib/python3.8/site-packages/openstack_dashboard/settings.py
+@@ -50,6 +50,8 @@ if ROOT_PATH not in sys.path:
+ 
+ DEBUG = False
+ 
++SNAP_COMMON = os.environ['SNAP_COMMON']
++
+ ROOT_URLCONF = 'openstack_dashboard.urls'
+ 
+ HORIZON_CONFIG = {
+@@ -211,7 +213,7 @@ USE_TZ = True
+ DEFAULT_EXCEPTION_REPORTER_FILTER = 'horizon.exceptions.HorizonReporterFilter'
+ 
+ SECRET_KEY = None
+-LOCAL_PATH = None
++LOCAL_PATH = "{}/etc/horizon".format(SNAP_COMMON)
+ 
+ ADD_INSTALLED_APPS = []
+ 
+@@ -260,7 +262,7 @@ else:
+     )
+ 
+ # allow to drop settings snippets into a local_settings_dir
+-LOCAL_SETTINGS_DIR_PATH = os.path.join(ROOT_PATH, "local", "local_settings.d")
++LOCAL_SETTINGS_DIR_PATH = os.path.join(LOCAL_PATH, "local_settings.d")
+ if os.path.exists(LOCAL_SETTINGS_DIR_PATH):
+     for (dirpath, dirnames, filenames) in os.walk(LOCAL_SETTINGS_DIR_PATH):
+         for filename in sorted(filenames):
+-- 
+2.17.1
+

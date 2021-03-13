@@ -1,0 +1,10 @@
+server {
+    listen 8778;
+    error_log syslog:server=unix:/dev/log;
+    access_log syslog:server=unix:/dev/log;
+    location / {
+        include {{ snap }}/usr/conf/uwsgi_params;
+        uwsgi_param SCRIPT_NAME '';
+        uwsgi_pass unix://{{ snap_common }}/run/placement-api.sock;
+    }
+}

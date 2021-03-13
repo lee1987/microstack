@@ -1,0 +1,26 @@
+{
+    "openstack": {
+        "admin": {
+            "password": "{{ keystone_password }}",
+            "project_domain_name": "default",
+            "project_name": "admin",
+            "user_domain_name": "default",
+            "username": "admin"
+        },
+        "api_info": {
+            "keystone": {
+                "service_type": "identityv3",
+                "version": 3
+            }
+        },
+        "auth_url": "http://{{ control_ip }}:5000",
+        "endpoint_type": null,
+        "https_cacert": "",
+        "https_cert": "",
+        "https_insecure": false,
+        "https_key": "",
+        "profiler_conn_str": null,
+        "profiler_hmac_key": null,
+        "region_name": ""
+    }
+}

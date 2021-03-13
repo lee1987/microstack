@@ -1,0 +1,102 @@
+#!/bin/bash
+# Copyright (c) 2017, Oracle and/or its affiliates. All rights reserved.
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; version 2 of the License.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301 USA
+
+set -e
+
+init_config() {
+  # Write out config.
+  # Include 'client' section for pymysql client.
+  # TODO: is [mysql] section necessary?
+  mkdir -p "${CONFDIR}"
+  echo "Generating config file in ${CONFFILE}..."
+  cat > ${CONFFILE} <<EOF
+[mysqld]
+pid-file=${RUNDIR}/mysqld.pid
+socket=${RUNDIR}/mysqld.sock
+port=${PORT}
+datadir=${DATADIR}
+log-error=${LOGDIR}/error.log
+secure-file-priv=${FILESDIR}
+basedir=${BASEDIR}
+
+skip-name-resolve
+
+[mysql]
+socket=${RUNDIR}/mysqld.sock
+port=${PORT}
+
+[client]
+socket=${RUNDIR}/mysqld.sock
+port=${PORT}
+
+[mysql_upgrade]
+socket=${RUNDIR}/mysqld.sock
+port=${PORT}
+EOF
+}
+
+init_sql() {
+  # Write out the initial SQL statements to execute on mysql initialization.
+  mkdir -p "${CONFDIR}"
+  touch ${INIT_SQL_FILE}
+  chmod 600 ${INIT_SQL_FILE}
+  echo "Setting a root user password..."
+  root_password=`snapctl get config.credentials.mysql-root-password`
+  cat > ${INIT_SQL_FILE} <<EOF
+ALTER USER 'root'@'localhost' IDENTIFIED BY '$root_password';
+EOF
+}
+
+init_database() {
+  echo "Initializing new database in ${DATADIR}..."
+  mkdir -p ${DATADIR}
+  init_sql
+  mysqld --defaults-file=${CONFFILE} --init-file=${INIT_SQL_FILE} --initialize-insecure --user=root
+  # Get rid of the file with the root password after initialization.
+  rm -f ${INIT_SQL_FILE}
+  echo "Done"
+}
+
+USERID=$(id -u)
+if [ "${USERID}" = "0" ];then
+  MYSQL_SNAPDIR="${SNAP_COMMON}"
+else
+  MYSQL_SNAPDIR="${SNAP_USER_COMMON}"
+fi
+
+DATADIR="${MYSQL_SNAPDIR}/lib/mysql"
+RUNDIR="${MYSQL_SNAPDIR}/run/mysql"
+LOGDIR="${MYSQL_SNAPDIR}/log/mysql"
+CONFDIR="${MYSQL_SNAPDIR}/etc/mysql"
+CONFFILE="${CONFDIR}/my.cnf"
+# A snap-specific temporary directory is used.
+INIT_SQL_FILE="/tmp/init.sql"
+FILESDIR="${MYSQL_SNAPDIR}/lib/mysql-files"
+BASEDIR="${SNAP}/usr"
+PORT=$(snapctl get config.network.ports.mysql)
+
+[ -d "${LOGDIR}" ] || mkdir -p ${LOGDIR}
+[ -f "${LOGDIR}/error.log" ] || touch ${LOGDIR}/error.log
+[ -d "${FILESDIR}" ] || {
+    mkdir -p ${FILESDIR}
+    chmod 0700 ${FILESDIR}
+}
+[ -d "${RUNDIR}" ] || mkdir -p ${RUNDIR}
+[ -d "${CONFDIR}" ] || init_config
+[ -d "${DATADIR}" ] || init_database
+
+echo "Starting server..."
+exec mysqld --defaults-file=${CONFFILE} --user=root $@
