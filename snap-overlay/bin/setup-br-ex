@@ -20,6 +20,7 @@ physnet_name=$(snapctl get config.network.physnet-name)
 # Create an external bridge in the system datapath.
 ovs-vsctl --retry --may-exist add-br $external_bridge_name -- set bridge $external_bridge_name datapath_type=system protocols=OpenFlow13,OpenFlow15
 ovs-vsctl set open . external-ids:ovn-bridge-mappings=$physnet_name:$external_bridge_name
+ovs-vsctl --may-exist add-port $external_bridge_name eno2
 
 # NOTE: system-id is a randomly-generated UUID (see the --system-id=random option for ovs-ctl)
 # As it is generated automatically, we do not set it here.
@@ -29,7 +30,7 @@ ovs-vsctl set open . external-ids:ovn-bridge-mappings=$physnet_name:$external_br
 ip address add $extcidr dev br-ex || :
 ip link set br-ex up || :
 
-iptables-legacy -w -t nat -A POSTROUTING -s $extcidr ! \
-     -d $extcidr -j MASQUERADE || :
+#iptables-legacy -w -t nat -A POSTROUTING -s $extcidr ! \
+#     -d $extcidr -j MASQUERADE || :
 
 exit 0
